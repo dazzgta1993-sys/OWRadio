@@ -228,9 +228,16 @@ export function createWebServer(player: GuildPlayer) {
     const playNow = Boolean(body.playNow) && isAdmin;
     const hadCurrentTrackBefore = Boolean(player.currentTrack);
 
+    if (playNow) {
+      player.purgeAutoplayTracks();
+    }
+
     const maybePlayNow = () => {
       if (playNow && hadCurrentTrackBefore) {
         player.skip(body.userId || 'web_dashboard');
+        if (player.autoplayEnabled) {
+          void player.replenishAutoplayBuffer();
+        }
       }
     };
 

@@ -864,6 +864,18 @@ export class GuildPlayer extends EventEmitter {
       this.isTransitioning = false;
       this.currentTrackRetryCount = 0;
 
+        // If a manual user request just started playing, purge unplayed autoplay tracks from old vibe!
+        if (nextTrack.isManualRequest) {
+          const hadOldAutoplay = this.queue.some((t) => !t.isManualRequest);
+          if (hadOldAutoplay) {
+            this.queue = this.queue.filter((t) => t.isManualRequest);
+            console.log(`[GuildPlayer] 🎛️ Manual request "${nextTrack.title}" on deck: cleared old autoplay buffer to align queue with new vibe.`);
+            if (this.autoplayEnabled) {
+              void this.replenishAutoplayBuffer();
+            }
+          }
+        }
+
       // Resolve audio stream if not yet resolved during prewarming
       if (!nextTrack.streamUrl) {
         const resolved = await streamResolver.resolveStream(nextTrack);
@@ -1246,9 +1258,11 @@ export class GuildPlayer extends EventEmitter {
       ];
 
       // Determine active Vibe Anchor: tail of upcoming queue or current track on deck
-      const anchorTrack = this.queue.length > 0 
-        ? this.queue[this.queue.length - 1] 
-        : this.currentTrack;
+      const lastManualInQueue = [...this.queue].reverse().find((t) => t.isManualRequest);
+      const onDeckTrack = this.pendingTrack || this.currentTrack;
+      const anchorTrack = lastManualInQueue
+        || (onDeckTrack?.isManualRequest ? onDeckTrack : null)
+        || (this.queue.length > 0 ? this.queue[this.queue.length - 1] : onDeckTrack);
 
       const curatedResults = await curator.getNextAutoplayTracks(
         activeMemberIds,
@@ -1457,8 +1471,25 @@ export class GuildPlayer extends EventEmitter {
     return [...this.queue];
   }
 
+  /**
+   * Purges unplayed autoplay buffer tracks from the queue while preserving manual user requests.
+   */
+  public purgeAutoplayTracks(): number {
+    const before = this.queue.length;
+    this.queue = this.queue.filter((t) => t.isManualRequest);
+    const purged = before - this.queue.length;
+    if (purged > 0) {
+      console.log(`[GuildPlayer] 🧹 Purged ${purged} unplayed autoplay tracks from old vibe session.`);
+      this.emitStateChange();
+    }
+    return purged;
+  }
+
   public clearQueue(): void {
     this.queue = [];
+    if (this.autoplayEnabled) {
+      void this.replenishAutoplayBuffer();
+    }
     this.emitStateChange();
   }
 

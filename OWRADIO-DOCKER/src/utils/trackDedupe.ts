@@ -9,6 +9,25 @@
  * Normalizes an artist name for strict and fuzzy equality comparisons.
  * Handles "The", "A", "An" prefixes, VEVO suffixes, Topic channels, and punctuation.
  */
+/**
+ * Splits composite or collaboration artist strings into individual artists.
+ * Handles: "Calvin Harris, Ellie Goulding", "David Guetta and Bebe Rexha",
+ * "Kygo feat. Conrad Sewell", "Swedish House Mafia ft. John Martin".
+ */
+export function extractArtists(artistStr: string): string[] {
+  if (!artistStr) return [];
+  const parts = artistStr.split(/(?:,|\s+&\s+|\s+and\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+featuring\s+|\s+with\s+|\s+vs\.?\s+|\s+x\s+)/i);
+  return parts.map((p) => p.trim()).filter((p) => p.length > 0);
+}
+
+/**
+ * Extracts the single primary lead artist from a collaboration string.
+ */
+export function extractPrimaryArtist(artistStr: string): string {
+  const list = extractArtists(artistStr);
+  return list[0] || (artistStr || '').trim();
+}
+
 export function normalizeArtist(artist: string): string {
   if (!artist) return '';
   let clean = artist.toLowerCase().trim();

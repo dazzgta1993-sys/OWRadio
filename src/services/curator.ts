@@ -13,7 +13,7 @@ import musicbrainz from './musicbrainz.js';
 import vetoService from './vetoService.js';
 import dynamicSettings from './dynamicSettings.js';
 import collaborativeGraph from './collaborativeGraph.js';
-import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../utils/trackDedupe.js';
+import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey, extractArtists, extractPrimaryArtist } from '../utils/trackDedupe.js';
 import baselineService from './baselineService.js';
 
 export type CurationEngineType = 'embedding' | 'hybrid' | 'graph' | 'deezer';
@@ -509,7 +509,7 @@ async function getHarmonicDJTrack(
   queuedDedupeKeys: Set<string> = new Set(),
   queuedLanguages: Set<string> = new Set()
 ): Promise<CuratedTrackResult | null> {
-  const normAnchor = anchorArtist.trim();
+  const normAnchor = extractPrimaryArtist(anchorArtist).trim();
   if (!normAnchor) return null;
 
   try {
@@ -611,7 +611,8 @@ export async function getNextAutoplayTracks(
   // 1. Explicitly passed anchor track (currently playing track or queue tail)
   // 2. Last played track in playback history
   // 3. Room liked artists or baseline scaffold
-  let activeAnchor = (anchorTrack?.artist || '').trim();
+  let rawAnchor = (anchorTrack?.artist || '').trim();
+  let activeAnchor = extractPrimaryArtist(rawAnchor);
 
   if (!activeAnchor) {
     const recent = getRecentPlaybackTitles(1);
@@ -644,7 +645,7 @@ export async function getNextAutoplayTracks(
       results.push(djResult);
 
       // HARMONIC CHAIN: Step forward to this new track's artist for the next song!
-      activeAnchor = djResult.track.artist;
+      activeAnchor = extractPrimaryArtist(djResult.track.artist);
     } else {
       // If activeAnchor is exhausted, try fallback to a room liked artist or baseline
       if (roomProfile.topLikedArtists.length > 0) {

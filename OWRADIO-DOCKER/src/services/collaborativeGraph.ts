@@ -6,7 +6,7 @@
 
 import config from '../config.js';
 import deezer, { type DeezerTrackMetadata } from './deezer.js';
-import { normalizeArtist } from '../utils/trackDedupe.js';
+import { normalizeArtist, extractArtists, extractPrimaryArtist } from '../utils/trackDedupe.js';
 
 export interface CollaborativeArtist {
   name: string;
@@ -84,7 +84,11 @@ export class CollaborativeGraphService {
    */
   private async fetchDeezerRelated(artistName: string, limit: number): Promise<Array<{ name: string }>> {
     try {
-      const artist = await deezer.searchArtist(artistName);
+      const primary = extractPrimaryArtist(artistName);
+      let artist = await deezer.searchArtist(primary);
+      if (!artist?.id && primary !== artistName) {
+        artist = await deezer.searchArtist(artistName);
+      }
       if (!artist || !artist.id) return [];
       const related = await deezer.getRelatedArtists(artist.id, limit);
       return related.map((r) => ({ name: r.name }));
