@@ -1,7 +1,7 @@
 /**
- * @file client.ts
- * @description Discord Client initialization, guild-scoped slash command registration,
- * command routing, and voice room membership state listeners.
+ * @file bot/client.ts
+ * @description Clean Discord Bot Client & Slash Command Handler for OWRadio.
+ * Supports /play, /skip, /pause, /resume, /stop, /vibe, /volume, and interactive Player Buttons.
  */
 
 import {
@@ -9,541 +9,205 @@ import {
   GatewayIntentBits,
   REST,
   Routes,
-  Events,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder,
-  type Interaction,
-  type VoiceState,
+  SlashCommandBuilder,
+  GuildMember,
+  Routes as DiscordRoutes,
 } from 'discord.js';
+import { joinVoiceChannel, DiscordGatewayAdapterCreator } from '@discordjs/voice';
 import config from '../config.js';
-import { sqlite } from '../db/index.js';
-import deezer from '../services/deezer.js';
-import dynamicSettings from '../services/dynamicSettings.js';
-import type { GuildPlayer } from '../player/GuildPlayer.js';
-import { executeAutoResume } from './autoResume.js';
-import playerUi from './playerUi.js';
-import {
-  playCommand,
-  vibeCommand,
-  handlePlay,
-  handleVibe,
-} from './commands/play.js';
-import {
-  controlCommand,
-  skipCommand,
-  pauseCommand,
-  resumeCommand,
-  stopCommand,
-  clearCommand,
-  removeCommand,
-  shuffleCommand,
-  replayCommand,
-  statusCommand,
-  historyCommand,
-  volumeCommand,
-  likeCommand,
-  dislikeCommand,
-  queueCommand,
-  joinCommand,
-  leaveCommand,
-  handleSkip,
-  handlePause,
-  handleResume,
-  handleStop,
-  handleClear,
-  handleRemove,
-  handleShuffle,
-  handleReplay,
-  handleStatus,
-  handleHistory,
-  handleVolume,
-  handleLike,
-  handleDislike,
-  handleQueue,
-  handleJoin,
-  handleLeave,
-} from './commands/controls.js';
+import globalPlayer from '../player/GuildPlayer.js';
+import { resolveQueryToTracks } from '../services/searchService.js';
+import { buildNowPlayingPayload } from './playerUi.js';
+import { runAutoResume } from './autoResume.js';
+import { VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
 
+export const discordClient = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildMessages,
+  ],
+});
 
+let activeVoiceChannelId: string | null = null;
 
+const commands = [
+  new SlashCommandBuilder()
+    .setName('play')
+    .setDescription('Play a studio song, album, Spotify link, or YouTube URL')
+    .addStringOption((opt) =>
+      opt.setName('query').setDescription('Song title, artist, Spotify or YouTube URL').setRequired(true)
+    ),
+  new SlashCommandBuilder().setName('skip').setDescription('Skip to the next track in Deck 2'),
+  new SlashCommandBuilder().setName('pause').setDescription('Pause playback'),
+  new SlashCommandBuilder().setName('resume').setDescription('Resume playback'),
+  new SlashCommandBuilder().setName('stop').setDescription('Stop playback and clear the queue'),
+  new SlashCommandBuilder()
+    .setName('volume')
+    .setDescription('Set broadcast & voice volume (0-200%)')
+    .addIntegerOption((opt) =>
+      opt.setName('level').setDescription('Volume percentage (0-200)').setRequired(true)
+    ),
+  new SlashCommandBuilder()
+    .setName('vibe')
+    .setDescription('Configure the real Multi-Platform Vibe Engine')
+    .addStringOption((opt) =>
+      opt
+        .setName('mode')
+        .setDescription('Vibe progression mode')
+        .addChoices(
+          { name: 'Balanced (Anchor + Similar)', value: 'balanced' },
+          { name: 'Deep Dive (Same Artist Catalog)', value: 'deep_dive' },
+          { name: 'Collabs & Circle', value: 'collabs' },
+          { name: 'Wild Discovery', value: 'discovery' }
+        )
+    )
+    .addStringOption((opt) =>
+      opt
+        .setName('engine')
+        .setDescription('Metadata & radio source')
+        .addChoices(
+          { name: 'Auto Multi-Cloud (Deezer + YTMusic + Apple)', value: 'auto' },
+          { name: 'Deezer Artist Radio', value: 'deezer' },
+          { name: 'YouTube Music Radio', value: 'ytmusic' },
+          { name: 'MusicBrainz Studio Discography', value: 'musicbrainz' },
+          { name: 'Official UK/US Top 40 Charts', value: 'charts' }
+        )
+    ),
+].map((c) => c.toJSON());
 
-// --- Consolidated Slash Commands List (Option C: 7 Master Commands) ---
-const ALL_COMMANDS = [
-  playCommand,     // /play <query>
-  controlCommand,  // /control <skip|pause|resume|replay|queue|clear|shuffle|remove|volume|status|history|like|dislike>
-  joinCommand,     // /join
-  leaveCommand,    // /leave
-];
-
-export async function createDiscordBot(player: GuildPlayer): Promise<Client> {
-  const client = new Client({
-    intents: [
-      GatewayIntentBits.Guilds,
-      GatewayIntentBits.GuildVoiceStates,
-      GatewayIntentBits.GuildMessages,
-    ],
-  });
-
-  player.setDiscordClient(client);
-
-  client.once(Events.ClientReady, async (readyClient) => {
-    console.log(`[DiscordBot] Logged in as ${readyClient.user.tag}`);
-
-    // Initialize Minimal Sleek Auto-Updating Discord UI
-    playerUi.init(readyClient, player);
-
-    // 1. Trigger intelligent auto-resume on startup immediately (no /play command required)
-    executeAutoResume(readyClient, player).catch((err) => {
-      console.error('[DiscordBot] Auto-resume background task failed:', (err as Error).message);
+async function updateDiscordVoiceStatus(statusText: string): Promise<void> {
+  if (!activeVoiceChannelId || !discordClient.isReady()) return;
+  try {
+    await discordClient.rest.put(`/channels/${activeVoiceChannelId}/voice-status` as any, {
+      body: { status: statusText.slice(0, 480) },
     });
+  } catch {}
+}
 
-    // 2. Resolve primary guild: DEFAULT_GUILD_ID or first cached guild
-    const guild = config.DEFAULT_GUILD_ID
-      ? readyClient.guilds.cache.get(config.DEFAULT_GUILD_ID)
-      : readyClient.guilds.cache.first();
+globalPlayer.on('trackStart', (track) => {
+  void updateDiscordVoiceStatus(`🎶 ${track.artist} - ${track.title}`);
+});
 
-    if (guild) {
-      console.log(`[DiscordBot] Primary guild selected: "${guild.name}" (${guild.id})`);
-      try {
-        // Register slash commands directly to primary guild for 0-second propagation
-        await guild.commands.set(ALL_COMMANDS.map((c) => c.toJSON()));
-        console.log(`[DiscordBot] Successfully registered ${ALL_COMMANDS.length} slash commands to guild "${guild.name}"`);
-
-        // Cache known guild members into users table non-blocking
-        const members = guild.members.cache;
-        const nowTs = Math.floor(Date.now() / 1000);
-        const upsertUserStmt = sqlite.prepare(`
-          INSERT OR REPLACE INTO users (id, username, display_name, avatar_url, updated_at)
-          VALUES (?, ?, ?, ?, ?)
-        `);
-        for (const [id, member] of members) {
-          if (member.user.bot) continue;
-          upsertUserStmt.run(
-            id,
-            member.user.username,
-            member.displayName || member.user.globalName || member.user.username,
-            member.user.displayAvatarURL() || null,
-            nowTs
-          );
-        }
-        console.log(`[DiscordBot] Synchronized ${members.size} cached guild members into users directory.`);
-      } catch (err) {
-        console.error('[DiscordBot] Guild setup error:', (err as Error).message);
+discordClient.once('ready', async () => {
+  console.log(`🤖 [Discord] Logged in as ${discordClient.user?.tag}`);
+  if (config.DISCORD_TOKEN && discordClient.user) {
+    const rest = new REST({ version: '10' }).setToken(config.DISCORD_TOKEN);
+    try {
+      if (config.GUILD_ID) {
+        await rest.put(Routes.applicationGuildCommands(discordClient.user.id, config.GUILD_ID), {
+          body: commands,
+        });
+      } else {
+        await rest.put(DiscordRoutes.applicationCommands(discordClient.user.id), {
+          body: commands,
+        });
       }
-    } else {
-      console.warn('[DiscordBot] No guild found in cache. Commands could not be registered to a primary guild.');
+    } catch (err) {
+      console.warn('⚠️ [Discord] Command registration notice:', (err as Error).message);
     }
-  });
+  }
+  await runAutoResume(discordClient);
+});
 
-  // Handle Slash Command and Button Interactions
-  client.on(Events.InteractionCreate, async (interaction: Interaction) => {
-    // Keep user identity fresh in users table
-    if (interaction.user) {
-      try {
-        sqlite.prepare(`
-          INSERT OR REPLACE INTO users (id, username, display_name, avatar_url, updated_at)
-          VALUES (?, ?, ?, ?, ?)
-        `).run(
-          interaction.user.id,
-          interaction.user.username,
-          (interaction.member as any)?.displayName || interaction.user.globalName || interaction.user.username,
-          interaction.user.displayAvatarURL() || null,
-          Math.floor(Date.now() / 1000)
-        );
-      } catch {}
-    }
-
-    // Handle Autocomplete for /play
-    if (interaction.isAutocomplete() && interaction.commandName === 'play') {
-      try {
-        const focused = interaction.options.getFocused();
-        if (!focused || focused.trim().length === 0) {
-          await interaction.respond([]);
-          return;
-        }
-        if (focused.startsWith('http://') || focused.startsWith('https://')) {
-          await interaction.respond([{ name: `🔗 Link: ${focused}`.slice(0, 100), value: focused.slice(0, 100) }]);
-          return;
-        }
-        const results = await deezer.searchTracks(focused, 5);
-        await interaction.respond(
-          results.map((t) => ({
-            name: `🎵 ${t.title} - ${t.artist}`.slice(0, 100),
-            value: `${t.artist} - ${t.title}`.slice(0, 100),
-          }))
-        );
-      } catch {
-        await interaction.respond([]).catch(() => {});
+discordClient.on('interactionCreate', async (interaction) => {
+  try {
+    if (interaction.isButton()) {
+      switch (interaction.customId) {
+        case 'owr_pause_resume':
+          if (globalPlayer.isPaused) globalPlayer.resume();
+          else globalPlayer.pause();
+          break;
+        case 'owr_skip':
+          globalPlayer.skip();
+          break;
+        case 'owr_stop':
+          globalPlayer.stop();
+          void updateDiscordVoiceStatus('');
+          break;
+        case 'owr_like':
+          globalPlayer.voteCurrentTrack('up');
+          break;
+        case 'owr_dislike':
+          globalPlayer.voteCurrentTrack('down');
+          break;
       }
+      await interaction.update(buildNowPlayingPayload(globalPlayer));
       return;
     }
 
-    // Handle StringSelectMenu for /remove
-    if (interaction.isStringSelectMenu()) {
-      if (interaction.customId === 'select_ui_remove_track') {
-        const idx = parseInt(interaction.values[0], 10);
-        if (isNaN(idx)) {
-          await interaction.reply({ content: '❌ Invalid track selected.', ephemeral: true });
-          return;
-        }
-        const removed = player.removeTrackAt(idx);
-        if (removed) {
-          await interaction.reply({
-            content: `🗑️ Removed **${removed.title}** by **${removed.artist}** from queue.`,
-            ephemeral: true,
-          });
-          playerUi.scheduleUpdate(false);
-        } else {
-          await interaction.reply({ content: '⚠️ Could not find track in queue.', ephemeral: true });
-        }
-        return;
-      }
-    }
-
-    // Handle Button Interactions
-    if (interaction.isButton()) {
-      try {
-        const customId = interaction.customId;
-
-      // --- Minimal Sleek Player UI Controls ---
-      if (customId === 'btn_ui_play_pause') {
-        if (!player.currentTrack) {
-          await interaction.reply({ content: '🔇 Nothing is currently playing.', ephemeral: true });
-          return;
-        }
-        if (player.isPaused) {
-          player.resume();
-        } else {
-          player.pause();
-        }
-        await interaction.deferUpdate().catch(() => {});
-        playerUi.scheduleUpdate(false);
-        return;
-      }
-
-      if (customId === 'btn_ui_skip') {
-        if (!player.currentTrack) {
-          await interaction.reply({ content: '🔇 Nothing is currently playing.', ephemeral: true });
-          return;
-        }
-        player.skip(interaction.user.id);
-        await interaction.deferUpdate().catch(() => {});
-        playerUi.scheduleUpdate(false);
-        return;
-      }
-
-      if (customId === 'btn_ui_replay') {
-        await handleReplay(interaction as any, player);
-        playerUi.scheduleUpdate(false);
-        return;
-      }
-
-      if (customId === 'btn_ui_shuffle') {
-        await handleShuffle(interaction as any, player);
-        playerUi.scheduleUpdate(false);
-        return;
-      }
-
-      if (customId === 'btn_ui_like') {
-        await handleLike(interaction as any, player);
-        return;
-      }
-
-      if (customId === 'btn_ui_dislike') {
-        await handleDislike(interaction as any, player);
-        return;
-      }
-
-      if (customId === 'btn_ui_vibe') {
-        // Preserve immediately primed Deck B so audio streaming is completely uninterrupted
-        player.recurateAutoplayBuffer(true).catch((err) => {
-          console.warn('[DiscordBot] Vibe recurate error:', (err as Error).message);
-        });
-        await interaction.reply({ content: '✨ Recurated upcoming queue to match active room vibe!', ephemeral: true });
-        playerUi.scheduleUpdate();
-        return;
-      }
-
-      if (customId === 'btn_ui_queue') {
-        await handleQueue(interaction as any, player);
-        return;
-      }
-
-      if (customId === 'btn_ui_more') {
-        const state = player.getStatePayload();
-        const liveSetting = dynamicSettings.getString('curation_filter_live', 'none');
-        const coverSetting = dynamicSettings.getString('curation_filter_covers', 'none');
-        const rerecordSetting = dynamicSettings.getString('curation_filter_rerecorded', 'none');
-        const liveBadge = liveSetting === 'none' ? '🚫 No Lives' : (liveSetting === 'high_quality' ? '⭐ HQ Lives' : '📻 Any Live');
-        const coverBadge = coverSetting === 'none' ? '🚫 No Covers' : (coverSetting === 'high_quality' ? '⭐ HQ Covers' : '📻 Any Cover');
-        const rerecordBadge = rerecordSetting === 'none' ? '🚫 Original Masters' : '📻 Any Cut';
-
-        const webBaseUrl = config.PUBLIC_URL || (state.streamUrl && !state.streamUrl.includes('127.0.0.1') ? state.streamUrl.replace('/stream.mp3', '') : (state.streamUrl ? state.streamUrl.replace('/stream.mp3', '') : `http://127.0.0.1:${config.WEB_PORT}`));
-        const cleanWebUrl = webBaseUrl.replace(/\/+$/, '');
-
-        const moreEmbed = new EmbedBuilder()
-          .setColor(0x6366f1)
-          .setTitle('⚙️ Station Controls & Listener Suite')
-          .setDescription(
-            `🔊 **Volume:** \`${state.volume}%\`  •  📋 **Queue Depth:** \`${state.queueLength} tracks\`\n` +
-            `🎛️ **Active Studio Guard:** \`${liveBadge}\`  •  \`${coverBadge}\`  •  \`${rerecordBadge}\`\n` +
-            (state.track ? `🎵 **Now Playing:** *${state.track.title}* — **${state.track.artist}**` : '🔇 *Idle*')
-          );
-
-        // Row 1: Taste Actions
-        const r1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId('btn_ui_like')
-            .setEmoji('❤️')
-            .setLabel('Like Song')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('btn_ui_dislike')
-            .setEmoji('💔')
-            .setLabel('Dislike Song')
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        // Row 2: Queue & Curation
-        const r2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId('btn_ui_vibe')
-            .setEmoji('✨')
-            .setLabel('AI Vibe')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('btn_ui_shuffle')
-            .setEmoji('🔀')
-            .setLabel('Shuffle')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setCustomId('btn_ui_queue')
-            .setEmoji('📋')
-            .setLabel('Queue')
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-        // Row 3: Studio Guard Filter, Web Studio & Close
-        const r3 = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId('btn_ui_filter')
-            .setEmoji('🎛️')
-            .setLabel('Studio Guard')
-            .setStyle(ButtonStyle.Secondary),
-          new ButtonBuilder()
-            .setLabel('Web Studio')
-            .setEmoji('🌐')
-            .setStyle(ButtonStyle.Link)
-            .setURL(cleanWebUrl.startsWith('http') ? cleanWebUrl : `https://${cleanWebUrl}`),
-          new ButtonBuilder()
-            .setCustomId('btn_ui_close_ephemeral')
-            .setEmoji('❌')
-            .setLabel('Close')
-            .setStyle(ButtonStyle.Danger)
-        );
-
-        await interaction.reply({
-          embeds: [moreEmbed],
-          components: [r1, r2, r3],
-          ephemeral: true,
-        });
-        return;
-      }
-
-      if (customId === 'btn_ui_close_ephemeral') {
-        try {
-          if ('deleteReply' in interaction && typeof (interaction as any).deleteReply === 'function') {
-            await (interaction as any).deleteReply();
-          } else {
-            await (interaction as any).deferUpdate().catch(() => {});
-          }
-        } catch {}
-        return;
-      }
-
-      if (customId === 'btn_vibe_steer_off') {
-                await player.recurateAutoplayBuffer();
-        await interaction.reply({
-          content: '✨ **384-d Latent Vibe Steering Disengaged.** Autoplay buffer purged and restored to natural room listener consensus.',
-          ephemeral: true,
-        });
-        return;
-      }
-    } catch (btnErr) {
-      console.error('[DiscordBot] Button interaction error:', (btnErr as Error).message);
-    }
-  }
-
     if (!interaction.isChatInputCommand()) return;
 
-    if (interaction.channelId) {
-      playerUi.setBoundChannelId(interaction.channelId);
-    }
+    if (interaction.commandName === 'play') {
+      await interaction.deferReply();
+      const query = interaction.options.getString('query', true);
+      const member = interaction.member as GuildMember | null;
+      const voiceChannel = member?.voice?.channel;
 
-    try {
-      switch (interaction.commandName) {
-        case 'play':
-          await handlePlay(interaction, player);
-          break;
-        case 'vibe':
-          await handleVibe(interaction, player);
-          break;
-        case 'control': {
-          const sub = interaction.options.getSubcommand();
-          switch (sub) {
-            case 'skip':
-              await handleSkip(interaction, player);
-              break;
-            case 'pause':
-              await handlePause(interaction, player);
-              break;
-            case 'resume':
-              await handleResume(interaction, player);
-              break;
-            case 'replay':
-              await handleReplay(interaction, player);
-              break;
-            case 'queue':
-              await handleQueue(interaction, player);
-              break;
-            case 'clear':
-              await handleClear(interaction, player);
-              break;
-            case 'shuffle':
-              await handleShuffle(interaction, player);
-              break;
-            case 'remove':
-              await handleRemove(interaction, player);
-              break;
-            case 'volume':
-              await handleVolume(interaction, player);
-              break;
-            case 'status':
-              await handleStatus(interaction, player);
-              break;
-            case 'history':
-              await handleHistory(interaction, player);
-              break;
-            case 'like':
-              await handleLike(interaction, player);
-              break;
-            case 'dislike':
-              await handleDislike(interaction, player);
-              break;
-            default:
-              await interaction.reply({ content: `⚠️ Unknown control subcommand: ${sub}`, ephemeral: true });
-          }
-          break;
-        }
-        
-        
-        case 'join':
-          await handleJoin(interaction, player);
-          break;
-        case 'leave':
-          await handleLeave(interaction, player);
-          break;
-        
-        
-        
-        
-        
-        
-        case 'skip':
-          await handleSkip(interaction, player);
-          break;
-        case 'pause':
-          await handlePause(interaction, player);
-          break;
-        case 'resume':
-          await handleResume(interaction, player);
-          break;
-        case 'stop':
-          await handleStop(interaction, player);
-          break;
-        case 'clear':
-          await handleClear(interaction, player);
-          break;
-        case 'remove':
-          await handleRemove(interaction, player);
-          break;
-        case 'shuffle':
-          await handleShuffle(interaction, player);
-          break;
-        case 'replay':
-          await handleReplay(interaction, player);
-          break;
-        case 'status':
-          await handleStatus(interaction, player);
-          break;
-        case 'history':
-          await handleHistory(interaction, player);
-          break;
-        case 'volume':
-          await handleVolume(interaction, player);
-          break;
-        case 'like':
-          await handleLike(interaction, player);
-          break;
-        case 'dislike':
-          await handleDislike(interaction, player);
-          break;
-        case 'queue':
-          await handleQueue(interaction, player);
-          break;
-        case 'join':
-          await handleJoin(interaction, player);
-          break;
-        case 'leave':
-          await handleLeave(interaction, player);
-          break;
-        
-        default:
-          console.warn(`[DiscordBot] Unrecognized command: ${interaction.commandName}`);
+      if (voiceChannel && interaction.guild) {
+        activeVoiceChannelId = voiceChannel.id;
+        const conn = joinVoiceChannel({
+          channelId: voiceChannel.id,
+          guildId: interaction.guild.id,
+          adapterCreator: interaction.guild.voiceAdapterCreator as unknown as DiscordGatewayAdapterCreator,
+          selfDeaf: true,
+        });
+        globalPlayer.attachVoiceConnection(conn);
       }
-    } catch (err) {
-      console.error(`[DiscordBot] Error handling /${interaction.commandName}:`, (err as Error).message);
-      const replyFn = interaction.deferred ? interaction.editReply.bind(interaction) : interaction.reply.bind(interaction);
-      await replyFn({ content: '❌ An error occurred executing this command.' }).catch(() => {});
-    } finally {
-      // Reposition now playing UI at the very bottom of the channel below the command output
-      setTimeout(() => {
-        playerUi.repositionToBottom();
-      }, 500);
-    }
-  });
 
-  // Handle Voice Channel Membership Updates with 8-second Debounce
-  let membershipDebounceTimer: NodeJS.Timeout | null = null;
-
-  client.on(Events.VoiceStateUpdate, async (oldState: VoiceState, newState: VoiceState) => {
-    // Ignore bot voice state updates
-    if (oldState.member?.user.bot || newState.member?.user.bot) return;
-
-    // Check if voice channel changed
-    if (oldState.channelId !== newState.channelId) {
-      const activeChannelUserIds = player.getActiveListenerUserIds();
-      // If someone joined or left the bot's current voice channel
-      const isAffected =
-        (oldState.channel && activeChannelUserIds.includes(oldState.member?.id || '')) ||
-        (newState.channel && activeChannelUserIds.includes(newState.member?.id || ''));
-
-      if (isAffected) {
-        console.log(`[DiscordBot] Listener room transition: ${oldState.member?.displayName || 'User'} moved channels. Debouncing room re-curation (8s)...`);
-        if (membershipDebounceTimer) {
-          clearTimeout(membershipDebounceTimer);
-        }
-        membershipDebounceTimer = setTimeout(async () => {
-          membershipDebounceTimer = null;
-          await player.handleVoiceRoomMembershipChange();
-        }, 8000);
+      const { tracks, collectionName } = await resolveQueryToTracks(query, interaction.user.username);
+      if (tracks.length === 0) {
+        await interaction.editReply(`⚠️ No studio tracks found for **${query}**.`);
+        return;
       }
-    }
-  });
 
-  return client;
+      if (tracks.length === 1) {
+        await globalPlayer.playNow(tracks[0]);
+      } else {
+        const [first, ...rest] = tracks;
+        await globalPlayer.playNow(first);
+        globalPlayer.enqueueMany(rest);
+      }
+
+      await interaction.editReply({
+        content: collectionName ? `📀 Loaded **${collectionName}**` : undefined,
+        ...buildNowPlayingPayload(globalPlayer),
+      });
+    } else if (interaction.commandName === 'skip') {
+      globalPlayer.skip();
+      await interaction.reply({ content: '⏭️ Skipped to next track.', ephemeral: true });
+    } else if (interaction.commandName === 'pause') {
+      globalPlayer.pause();
+      await interaction.reply({ content: '⏸️ Paused playback.', ephemeral: true });
+    } else if (interaction.commandName === 'resume') {
+      globalPlayer.resume();
+      await interaction.reply({ content: '▶️ Resumed playback.', ephemeral: true });
+    } else if (interaction.commandName === 'stop') {
+      globalPlayer.stop();
+      void updateDiscordVoiceStatus('');
+      await interaction.reply({ content: '⏹️ Stopped playback and cleared queue.', ephemeral: true });
+    } else if (interaction.commandName === 'volume') {
+      const lvl = interaction.options.getInteger('level', true);
+      const updated = globalPlayer.setVolume(lvl);
+      await interaction.reply({ content: `🔊 Volume set to **${updated}%**.`, ephemeral: true });
+    } else if (interaction.commandName === 'vibe') {
+      const mode = interaction.options.getString('mode') as VibeMode | null;
+      const engine = interaction.options.getString('engine') as VibeEngineSource | null;
+      globalPlayer.setVibeConfig(mode || undefined, engine || undefined);
+      await interaction.reply({
+        content: `🎛️ Vibe updated — Mode: **${globalPlayer.vibeMode.toUpperCase()}** | Engine: **${globalPlayer.vibeEngineSource.toUpperCase()}**`,
+        ephemeral: true,
+      });
+    }
+  } catch (err) {
+    console.error('❌ [Discord] Interaction error:', err);
+  }
+});
+
+export async function startDiscordBot(): Promise<void> {
+  if (!config.isDiscordEnabled) {
+    console.log('ℹ️ [Discord] No DISCORD_TOKEN set — running in Standalone Web Radio Mode.');
+    return;
+  }
+  await discordClient.login(config.DISCORD_TOKEN);
 }
-
-export default createDiscordBot;

@@ -1,355 +1,333 @@
 /**
- * @file youtube.ts
- * @description YouTube service providing native video metadata extraction, playlist resolution,
- * candidate audio search, and high-bitrate Opus stream extraction via yt-dlp.
+ * @file services/youtube.ts
+ * @description Port of Album Discovery Bot's 6-Pass Studio Stream Resolver + yt-dlp extractor.
+ * 1. Pre-enriches canonical track duration & ISRC from Deezer when duration <= 0 so the
+ *    strict +/-5s duration guardrail is ALWAYS enforced even on Pass 1.
+ * 2. Scores YouTube Music WEB_REMIX candidates (+50 for ATV/Topic studio masters, -60 for UGC).
+ * 3. Extracts direct audio stream URLs via yt-dlp with L1 memory + L2 SQLite caching.
  */
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { existsSync } from 'node:fs';
-import path from 'node:path';
+import fs from 'node:fs';
 import config from '../config.js';
+import {
+  getStreamResolution,
+  setStreamResolution,
+  StreamResolutionRecord,
+} from '../db/store.js';
+import {
+  cleanTargetTitle,
+  isDurationValid,
+  isUnwantedVariant,
+  isTitleMatch,
+  isArtistMatch,
+} from './streamFilters.js';
+import { searchYtMusicSongs, YtMusicCandidate } from './ytmusic.js';
+import { searchDeezerTracks, getDeezerTrackIsrc } from './deezer.js';
 
 const execFileAsync = promisify(execFile);
 
-export interface YouTubeTrackMetadata {
-  /** Canonical VEXO ID: e.g. "yt_F6_BSFHaCDU" */
-  id: string;
-  /** Raw 11-character YouTube Video ID */
-  videoId: string;
-  /** Song / Video Title */
-  title: string;
-  /** Artist or Channel Name */
-  artist: string;
-  /** Track duration in seconds */
-  durationSec: number;
-  /** High-resolution artwork URL */
-  artworkUrl: string;
-  /** Low-overhead thumbnail artwork URL */
-  artworkThumbUrl: string;
-}
+const streamUrlCache = new Map<
+  string,
+  { url: string; headers: Record<string, string>; expiresAt: number; duration?: number }
+>();
 
-/**
- * Words that indicate alternative / non-studio versions.
- */
-const UNWANTED_VARIANTS = [
-  'live',
-  'karaoke',
-  '8d',
-  'slowed',
-  'reverb',
-  'nightcore',
-  'cover',
-  'instrumental',
-  'tribute',
-  'remake',
-  'parody',
-  'bass boosted',
-  'mix',
-  'medley',
-  'podcast',
-  'full album',
-  'drop b',
-  'tuning',
-  'guitar',
-  'backing track',
-  'acoustic',
-  'tutorial',
-  'lesson',
-  'reaction',
-];
-
-/**
- * Checks if a candidate title contains unwanted variant keywords that aren't part of the canonical title.
- */
-export function isVariantClean(candidateTitle: string, canonicalTitle: string): boolean {
-  const normCandidate = candidateTitle.toLowerCase();
-  const normCanonical = canonicalTitle.toLowerCase();
-
-  for (const word of UNWANTED_VARIANTS) {
-    if (normCandidate.includes(word) && !normCanonical.includes(word)) {
-      return false;
-    }
+function getYtDlpBaseArgs(): string[] {
+  const args = ['--no-playlist', '--no-warnings', '--quiet', '--geo-bypass'];
+  if (config.YOUTUBE_COOKIES_PATH && fs.existsSync(config.YOUTUBE_COOKIES_PATH)) {
+    args.push('--cookies', config.YOUTUBE_COOKIES_PATH);
+  } else if (fs.existsSync('./cookies.txt')) {
+    args.push('--cookies', './cookies.txt');
   }
-  return true;
-}
-
-/**
- * Parses raw YouTube video title and channel/uploader into clean artist and track title.
- */
-export function parseYouTubeTitle(rawTitle: string, uploader: string): { title: string; artist: string } {
-  // Strip common YouTube fluff suffixes
-  const cleanedTitle = rawTitle
-    .replace(/\s*[\(\[](?:Official\s*(?:Music\s*)?(?:Video|Audio|Lyric\s*Video|Visualizer|HD|4K)?|Lyrics?|Remaster(?:ed)?(?:\s*\d{4})?|Music\s*Video)[\)\]]/gi, '')
-    .trim();
-
-  // Look for standard "Artist - Title" separators
-  const parts = cleanedTitle.split(/\s*[-–—:]\s*/);
-  if (parts.length >= 2 && parts[0].trim().length > 0 && parts[1].trim().length > 0) {
-    return {
-      artist: parts[0].trim(),
-      title: parts.slice(1).join(' - ').trim(),
-    };
-  }
-
-  // Fallback: use uploader (stripping "- Topic" and "VEVO")
-  const cleanUploader = (uploader || 'Unknown Artist')
-    .replace(/\s*-\s*Topic$/i, '')
-    .replace(/VEVO$/i, '')
-    .trim();
-
-  return {
-    artist: cleanUploader || 'Unknown Artist',
-    title: cleanedTitle || rawTitle,
-  };
-}
-
-/**
- * Builds base arguments for yt-dlp executions including proxy and cookie options.
- */
-function getBaseYtDlpArgs(): string[] {
-  const args = ['--no-warnings', '--no-check-certificates'];
   if (config.YOUTUBE_PROXY) {
     args.push('--proxy', config.YOUTUBE_PROXY);
-  }
-  const cookiesPath = config.YOUTUBE_COOKIES_PATH || (existsSync(path.resolve(process.cwd(), 'cookies.txt')) ? path.resolve(process.cwd(), 'cookies.txt') : undefined);
-  if (cookiesPath) {
-    args.push('--cookies', cookiesPath);
   }
   return args;
 }
 
 /**
- * Search YouTube Music directly for official studio tracks matching a query.
+ * 6-Pass Studio Track Resolver:
+ * Resolves any (artist, title, album, duration, isrc) to its official YouTube studio audio videoId.
  */
-export async function searchYouTubeMusic(query: string, limit = 5): Promise<YouTubeTrackMetadata[]> {
-  const baseArgs = getBaseYtDlpArgs();
-  const searchArg = `ytsearch${limit}:${query} Official Audio`;
+export async function resolveTrackStream(params: {
+  artist: string;
+  title: string;
+  album?: string;
+  duration?: number;
+  trackId?: string;
+  isrc?: string;
+  forceFresh?: boolean;
+}): Promise<StreamResolutionRecord | null> {
+  let cleanArtist = (params.artist || '').trim();
+  const cleanTitle = (params.title || '').trim();
+  let cleanAlbum = (params.album || '').trim();
+  const cleanCore = cleanTargetTitle(cleanTitle);
+  let cleanIsrc = (params.isrc || '').trim().toUpperCase();
+  let duration = Math.max(0, Math.floor(Number(params.duration) || 0));
+  let trackId = (params.trackId || '').trim();
+
+  if (!cleanTitle) return null;
+
+  // Guardrail Upgrade: If duration <= 0, enrich canonical duration & ISRC from Deezer first
+  // so Pass 1 ALWAYS enforces the strict +/-5s studio duration check!
+  if (duration <= 0) {
+    try {
+      const artPart = ['youtube', 'youtube search', 'direct query', 'unknown', 'unknown artist'].includes(
+        cleanArtist.toLowerCase()
+      )
+        ? ''
+        : cleanArtist;
+      const dzHits = await searchDeezerTracks(`${artPart} ${cleanCore}`.trim(), 3);
+      for (const hit of dzHits) {
+        if (
+          isTitleMatch(hit.title, cleanTitle) &&
+          (!artPart || isArtistMatch({ channel: hit.artist, artists: [hit.artist] }, artPart))
+        ) {
+          if (hit.duration >= 45) duration = hit.duration;
+          if (!artPart && hit.artist) cleanArtist = hit.artist;
+          if (!cleanAlbum && hit.album) cleanAlbum = hit.album;
+          if (!trackId && hit.id) trackId = hit.id;
+          if (!cleanIsrc && hit.isrc) cleanIsrc = hit.isrc;
+          break;
+        }
+      }
+    } catch {}
+  }
+
+  const cacheKey = `${cleanArtist.toLowerCase()}:::${cleanTitle.toLowerCase()}:::${cleanAlbum.toLowerCase()}`;
+
+  if (!params.forceFresh) {
+    const dbRes = getStreamResolution(cacheKey);
+    if (
+      dbRes &&
+      isDurationValid(dbRes.duration, duration, 5) &&
+      !isUnwantedVariant(dbRes.title, cleanTitle, dbRes.channel || '')
+    ) {
+      return dbRes;
+    }
+  }
+
+  const candidates: Array<{ score: number; item: YtMusicCandidate }> = [];
+  const seenIds = new Set<string>();
+
+  const evaluateItems = (items: YtMusicCandidate[], toleranceSecs = 5, matchTarget = cleanTitle) => {
+    for (const item of items) {
+      if (!item.id || seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+
+      if (!isDurationValid(item.durationSeconds, duration, toleranceSecs, duration <= 0)) continue;
+      if (isUnwantedVariant(item.title, matchTarget, item.channel)) continue;
+      if (!isTitleMatch(item.title, matchTarget)) continue;
+      if (!isArtistMatch(item, cleanArtist)) continue;
+
+      let score = 0;
+      const chLow = (item.channel || '').toLowerCase();
+
+      if (item.videoType === 'MUSIC_VIDEO_TYPE_UGC') score -= 60;
+      if (item.videoType === 'MUSIC_VIDEO_TYPE_ATV' || chLow.includes('topic')) score += 50;
+      else if (chLow.includes('vevo')) score += 35;
+      else if (cleanArtist && chLow.includes(cleanArtist.toLowerCase())) score += 25;
+
+      const normCand = item.title.toLowerCase().replace(/[^\w\s]/g, '').trim();
+      const normTarget = cleanCore.toLowerCase().replace(/[^\w\s]/g, '').trim();
+      if (normCand === normTarget) score += 30;
+      else if (normCand.includes(normTarget)) score += 15;
+
+      if (cleanAlbum && item.album && item.album.toLowerCase().includes(cleanAlbum.toLowerCase())) {
+        score += 20;
+      }
+
+      if (duration > 0 && item.durationSeconds > 0) {
+        const diff = Math.abs(item.durationSeconds - duration);
+        if (diff <= 1) score += 25;
+        else if (diff <= 3) score += 15;
+      }
+
+      const tLow = item.title.toLowerCase();
+      if (tLow.includes('official audio') || tLow.includes('(audio)')) score += 35;
+      if (tLow.includes('lyrics') || tLow.includes('lyric video')) score -= 20;
+
+      candidates.push({ score, item });
+    }
+  };
+
+  // Pass 1: Direct Clean Studio Queries on YouTube Music WEB_REMIX
+  const fastQueries = [`${cleanArtist} ${cleanCore}`.trim(), `${cleanArtist} - ${cleanCore}`.trim()];
+  if (cleanAlbum) fastQueries.splice(1, 0, `${cleanArtist} ${cleanAlbum} ${cleanCore}`.trim());
+
+  for (const q of fastQueries) {
+    const items = await searchYtMusicSongs(q, true, 12);
+    evaluateItems(items, 5);
+    if (candidates.some((c) => c.score >= 50)) break;
+  }
+
+  // Pass 2: Specific Quoted Official Audio Match
+  if (candidates.length === 0) {
+    const quoted = [`"${cleanArtist} - ${cleanCore} (Official Audio)"`, `"${cleanArtist}" "${cleanCore}"`];
+    for (const q of quoted) {
+      const items = await searchYtMusicSongs(q, true, 10);
+      evaluateItems(items, 5);
+      if (candidates.some((c) => c.score >= 50)) break;
+    }
+  }
+
+  // Pass 3: Exact ISRC Lookup
+  if (candidates.length === 0) {
+    if (!cleanIsrc && trackId && /^\d+$/.test(trackId)) {
+      cleanIsrc = await getDeezerTrackIsrc(trackId);
+    }
+    if (cleanIsrc) {
+      const isrcItems = await searchYtMusicSongs(cleanIsrc, true, 8);
+      evaluateItems(isrcItems, 6);
+    }
+  }
+
+  // Pass 4: Stripped Core Title with +/-8s relaxed tolerance
+  if (candidates.length === 0) {
+    const items = await searchYtMusicSongs(`${cleanArtist} ${cleanCore}`.trim(), true, 15);
+    evaluateItems(items, 8, cleanCore);
+  }
+
+  // Pass 5: Unfiltered YouTube Music catalog (includes official videos)
+  if (candidates.length === 0) {
+    const items = await searchYtMusicSongs(`${cleanArtist} ${cleanCore} official audio`.trim(), false, 12);
+    evaluateItems(items, 10, cleanCore);
+  }
+
+  if (candidates.length > 0) {
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0].item;
+    const resolved: StreamResolutionRecord = {
+      id: best.id,
+      title: best.title || cleanTitle,
+      artist: cleanArtist || best.channel,
+      album: best.album || cleanAlbum,
+      duration: best.durationSeconds || duration,
+      channel: best.channel,
+      matchType: best.isOfficialStudio ? 'ytmusic_atv_topic' : 'ytmusic_verified',
+    };
+    setStreamResolution(cacheKey, resolved);
+    return resolved;
+  }
+
+  // Pass 6: yt-dlp direct search fallback
+  const ytdlpHits = await searchYouTubeBasic(`${cleanArtist} - ${cleanCore} Official Audio`.trim(), 3);
+  if (ytdlpHits.length > 0) {
+    const top = ytdlpHits[0];
+    const resolved: StreamResolutionRecord = {
+      id: top.id,
+      title: top.title || cleanTitle,
+      artist: cleanArtist || top.artist,
+      album: cleanAlbum,
+      duration: top.duration || duration,
+      channel: top.artist,
+      matchType: 'ytdlp_fallback',
+    };
+    setStreamResolution(cacheKey, resolved);
+    return resolved;
+  }
+
+  return null;
+}
+
+/**
+ * Extracts direct playable audio stream URL and HTTP headers for a YouTube videoId via yt-dlp.
+ */
+export async function extractStreamInfo(
+  videoId: string
+): Promise<{ url: string; headers: Record<string, string>; duration?: number } | null> {
+  const cleanVid = (videoId || '').replace(/^yt_/, '').trim();
+  if (!cleanVid) return null;
+
+  const cached = streamUrlCache.get(cleanVid);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { url: cached.url, headers: cached.headers, duration: cached.duration };
+  }
+
+  const targetUrl = cleanVid.startsWith('http')
+    ? cleanVid
+    : `https://www.youtube.com/watch?v=${cleanVid}`;
+
+  const args = [
+    ...getYtDlpBaseArgs(),
+    '-f',
+    'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio/best',
+    '--dump-single-json',
+    targetUrl,
+  ];
 
   try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      ...baseArgs,
-      '--dump-json',
-      '--flat-playlist',
-      '--default-search', 'ytsearch',
-      searchArg,
-    ], { timeout: 12000, maxBuffer: 10 * 1024 * 1024 });
+    const { stdout } = await execFileAsync('yt-dlp', args, { timeout: 15000, maxBuffer: 10 * 1024 * 1024 });
+    const info = JSON.parse(stdout);
+    const streamUrl = String(info?.url || '');
+    if (!streamUrl) return null;
 
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const results: YouTubeTrackMetadata[] = [];
-
-    for (const line of lines) {
-      try {
-        const item = JSON.parse(line);
-        if (!item.id) continue;
-
-        const duration = Number(item.duration) || 0;
-        const rawTitle = item.title || 'Unknown Title';
-        const uploader = item.uploader || item.channel || '';
-        const { title, artist } = parseYouTubeTitle(rawTitle, uploader);
-
-        results.push({
-          id: `yt_${item.id}`,
-          videoId: item.id,
-          title,
-          artist,
-          durationSec: duration,
-          artworkUrl: `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`,
-          artworkThumbUrl: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
-        });
-      } catch {
-        // Skip unparseable line
+    const headers: Record<string, string> = {};
+    if (info?.http_headers && typeof info.http_headers === 'object') {
+      for (const [k, v] of Object.entries(info.http_headers)) {
+        headers[k] = String(v);
       }
+    }
+    const duration = info?.duration ? Math.round(Number(info.duration)) : undefined;
+    streamUrlCache.set(cleanVid, {
+      url: streamUrl,
+      headers,
+      duration,
+      expiresAt: Date.now() + 3 * 3600 * 1000, // 3 hours TTL
+    });
+    return { url: streamUrl, headers, duration };
+  } catch (err) {
+    console.warn(`⚠️ [yt-dlp] Stream extraction failed for ${cleanVid}:`, (err as Error).message);
+    return null;
+  }
+}
+
+/**
+ * Basic YouTube search via yt-dlp for live performances, DJ sets, or direct video queries.
+ */
+export async function searchYouTubeBasic(
+  query: string,
+  limit = 5
+): Promise<Array<{ id: string; title: string; artist: string; duration: number; cover: string; releaseYear: string }>> {
+  const q = (query || '').trim();
+  if (!q) return [];
+
+  const isUrl = /^https?:\/\//i.test(q);
+  const searchSpec = isUrl ? q : `ytsearch${limit}:${q}`;
+  const args = [...getYtDlpBaseArgs(), '--flat-playlist', '--dump-single-json', searchSpec];
+
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', args, { timeout: 12000, maxBuffer: 10 * 1024 * 1024 });
+    const data = JSON.parse(stdout);
+    const entries = Array.isArray(data?.entries) ? data.entries : [data];
+    const results: Array<{ id: string; title: string; artist: string; duration: number; cover: string; releaseYear: string }> = [];
+
+    for (const e of entries) {
+      const id = String(e?.id || '').trim();
+      const rawTitle = String(e?.title || '').trim();
+      if (!id || !rawTitle) continue;
+      let artist = String(e?.channel || e?.uploader || 'YouTube').replace(/\s*-\s*Topic$/i, '').trim();
+      let title = rawTitle;
+      if (rawTitle.includes(' - ')) {
+        const [p1, p2] = rawTitle.split(' - ', 2);
+        artist = p1.trim();
+        title = p2.trim();
+      }
+      const duration = Math.round(Number(e?.duration || 0));
+      const releaseYear = String(e?.release_year || e?.upload_date || '').slice(0, 4);
+      results.push({
+        id,
+        title,
+        artist,
+        duration,
+        cover: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+        releaseYear: /^\d{4}$/.test(releaseYear) ? releaseYear : '',
+      });
+      if (results.length >= limit) break;
     }
     return results;
   } catch {
     return [];
   }
 }
-
-/**
- * Search tracks: tries YouTube Music (ytmsearch) for official studio audio first,
- * falling back to standard YouTube (ytsearch) for live or rare tracks.
- */
-export async function searchTracks(query: string, limit = 5): Promise<YouTubeTrackMetadata[]> {
-  // 1. Try YouTube Music first for official release quality
-  const ytmResults = await searchYouTubeMusic(query, limit);
-  if (ytmResults.length > 0) {
-    return ytmResults;
-  }
-
-  // 2. Fallback to standard YouTube search
-  const baseArgs = getBaseYtDlpArgs();
-  const searchArg = `ytsearch${limit}:${query} Official Audio`;
-
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      ...baseArgs,
-      '--dump-json',
-      '--flat-playlist',
-      '--default-search', 'ytsearch',
-      searchArg,
-    ], { timeout: 15000, maxBuffer: 10 * 1024 * 1024 });
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const results: YouTubeTrackMetadata[] = [];
-
-    for (const line of lines) {
-      try {
-        const item = JSON.parse(line);
-        if (!item.id) continue;
-
-        const duration = Number(item.duration) || 0;
-        const rawTitle = item.title || 'Unknown Title';
-        const uploader = item.uploader || item.channel || '';
-        const { title, artist } = parseYouTubeTitle(rawTitle, uploader);
-
-        results.push({
-          id: `yt_${item.id}`,
-          videoId: item.id,
-          title,
-          artist,
-          durationSec: duration,
-          artworkUrl: `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`,
-          artworkThumbUrl: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
-        });
-      } catch {
-        // Skip unparseable line
-      }
-    }
-
-    return results;
-  } catch (err) {
-    console.warn(`[YouTube] Search failed for "${query}":`, (err as Error).message);
-    return [];
-  }
-}
-
-/**
- * Retrieve metadata for a single YouTube video by video ID or URL.
- */
-export async function getTrack(videoIdOrUrl: string): Promise<YouTubeTrackMetadata | null> {
-  const videoId = videoIdOrUrl.replace(/^yt_/, '').replace(/^https?:\/\/.*(?:watch\?v=|youtu\.be\/)/, '').split('&')[0];
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const baseArgs = getBaseYtDlpArgs();
-
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      ...baseArgs,
-      '--dump-json',
-      '--flat-playlist',
-      url,
-    ], { timeout: 10000 });
-
-    const item = JSON.parse(stdout.trim().split('\n')[0]);
-    if (!item.id) return null;
-
-    const duration = Number(item.duration) || 0;
-    const rawTitle = item.title || 'Unknown Title';
-    const uploader = item.uploader || item.channel || '';
-    const { title, artist } = parseYouTubeTitle(rawTitle, uploader);
-
-    return {
-      id: `yt_${item.id}`,
-      videoId: item.id,
-      title,
-      artist,
-      durationSec: duration,
-      artworkUrl: `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`,
-      artworkThumbUrl: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
-    };
-  } catch (err) {
-    console.warn(`[YouTube] Failed to get video metadata for "${videoIdOrUrl}":`, (err as Error).message);
-    return null;
-  }
-}
-
-/**
- * Retrieve all tracks from a YouTube playlist (up to limit, default 50).
- */
-export async function getPlaylistTracks(playlistIdOrUrl: string, limit = 50): Promise<YouTubeTrackMetadata[]> {
-  const playlistId = playlistIdOrUrl.includes('list=')
-    ? playlistIdOrUrl.split('list=')[1].split('&')[0]
-    : playlistIdOrUrl;
-  const url = `https://www.youtube.com/playlist?list=${playlistId}`;
-  const baseArgs = getBaseYtDlpArgs();
-
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      ...baseArgs,
-      '--flat-playlist',
-      '--dump-json',
-      '--playlist-items', `1-${limit}`,
-      url,
-    ], { timeout: 20000, maxBuffer: 15 * 1024 * 1024 });
-
-    const lines = stdout.trim().split('\n').filter(Boolean);
-    const tracks: YouTubeTrackMetadata[] = [];
-
-    for (const line of lines) {
-      try {
-        const item = JSON.parse(line);
-        if (!item.id) continue;
-
-        const duration = Number(item.duration) || 0;
-        const rawTitle = item.title || 'Unknown Title';
-        const uploader = item.uploader || item.channel || '';
-        const { title, artist } = parseYouTubeTitle(rawTitle, uploader);
-
-        tracks.push({
-          id: `yt_${item.id}`,
-          videoId: item.id,
-          title,
-          artist,
-          durationSec: duration,
-          artworkUrl: `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
-          artworkThumbUrl: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
-        });
-      } catch {
-        // Skip malformed candidate
-      }
-    }
-
-    return tracks;
-  } catch (err) {
-    console.warn(`[YouTube] Failed to fetch playlist tracks for "${playlistIdOrUrl}":`, (err as Error).message);
-    return [];
-  }
-}
-
-/**
- * Extracts the direct Opus / bestaudio audio stream URL for a YouTube video.
- */
-export async function getStreamUrl(videoId: string): Promise<string | null> {
-  const cleanId = videoId.replace(/^yt_/, '');
-  const url = `https://www.youtube.com/watch?v=${cleanId}`;
-  const baseArgs = getBaseYtDlpArgs();
-
-  try {
-    const { stdout } = await execFileAsync('yt-dlp', [
-      ...baseArgs,
-      '-g',
-      '-f', 'bestaudio[acodec=opus]/bestaudio',
-      url,
-    ], { timeout: 10000 });
-
-    const streamUrl = stdout.trim().split('\n')[0];
-    if (streamUrl && streamUrl.startsWith('http')) {
-      return streamUrl;
-    }
-    return null;
-  } catch (err) {
-    console.warn(`[YouTube] Stream extraction failed for "${cleanId}":`, (err as Error).message);
-    return null;
-  }
-}
-
-export default {
-  searchTracks,
-  searchYouTubeMusic,
-  getTrack,
-  getPlaylistTracks,
-  getStreamUrl,
-  isVariantClean,
-  parseYouTubeTitle,
-};

@@ -1,1095 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OWRadio • Discord & Web Audio Hub</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <meta http-equiv="Pragma" content="no-cache" />
-  <meta http-equiv="Expires" content="0" />
-  <style>
-    :root {
-      --bg-dark: #0a0b0e;
-      --bg-card: rgba(18, 19, 27, 0.78);
-      --bg-card-hover: rgba(26, 28, 40, 0.9);
-      --bg-input: rgba(0, 0, 0, 0.4);
-      --accent: #9d4edd;
-      --accent-glow: rgba(157, 78, 221, 0.35);
-      --accent-secondary: #c77dff;
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --text-subtle: #6b7280;
-      --border: rgba(255, 255, 255, 0.08);
-      --border-focus: rgba(157, 78, 221, 0.6);
-      --success: #22c55e;
-      --danger: #ef4444;
-      --radius-lg: 14px;
-      --radius-md: 10px;
-      --radius-sm: 6px;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-    }
-
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: rgba(0, 0, 0, 0.15);
-      border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(157, 78, 221, 0.35);
-      border-radius: 999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(157, 78, 221, 0.6);
-    }
-
-    html, body {
-      height: 100vh;
-      max-height: 100vh;
-      overflow: hidden;
-      background: radial-gradient(circle at top left, #161129, #0a0b0e 70%);
-      color: var(--text);
-    }
-
-    /* Top Navigation Header */
-    header {
-      background: rgba(10, 11, 14, 0.85);
-      backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-      padding: 8px 22px;
-      height: 52px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      flex-shrink: 0;
-      z-index: 50;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      text-decoration: none;
-      color: inherit;
-      flex-shrink: 0;
-    }
-
-    .brand-logo {
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      background: linear-gradient(135deg, #9d4edd, #5a189a);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      box-shadow: 0 0 14px var(--accent-glow);
-    }
-
-    .brand-title {
-      font-size: 1.12rem;
-      font-weight: 800;
-      letter-spacing: -0.4px;
-      background: linear-gradient(90deg, #ffffff, #c77dff);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      line-height: 1.1;
-    }
-
-    .brand-subtitle {
-      font-size: 0.65rem;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      font-weight: 600;
-    }
-
-    /* Fast-Play Command Search Bar */
-    .header-fast-play {
-      flex: 1;
-      max-width: 600px;
-      display: flex;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      padding: 3px 6px 3px 14px;
-      gap: 8px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      transition: all 0.2s ease;
-    }
-
-    .header-fast-play:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 14px var(--accent-glow);
-    }
-
-    .search-icon {
-      color: var(--text-muted);
-      font-size: 0.85rem;
-      flex-shrink: 0;
-    }
-
-    .fast-play-input {
-      flex: 1;
-      min-width: 140px;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #fff;
-      font-size: 0.84rem;
-      font-weight: 500;
-    }
-
-    .btn-fast-play {
-      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
-      color: #fff;
-      border: none;
-      border-radius: 999px;
-      padding: 6px 14px;
-      font-size: 0.76rem;
-      font-weight: 700;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
-      transition: all 0.2s;
-    }
-
-    .btn-fast-play:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
-    }
-
-    .btn-fast-queue {
-      background: rgba(255, 255, 255, 0.08);
-      color: #e2e8f0;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 999px;
-      padding: 6px 12px;
-      font-size: 0.76rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-      transition: all 0.2s;
-    }
-
-    .btn-fast-queue:hover {
-      background: rgba(255, 255, 255, 0.15);
-      color: #fff;
-    }
-
-    .nav-right {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(34, 197, 94, 0.12);
-      border: 1px solid rgba(34, 197, 94, 0.25);
-      color: #4ade80;
-      font-weight: 600;
-    }
-
-    .pulse-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 8px #22c55e;
-      animation: pulseAnim 2s infinite;
-    }
-
-    @keyframes pulseAnim {
-      0% { opacity: 0.6; }
-      50% { opacity: 1; filter: drop-shadow(0 0 4px #22c55e); }
-      100% { opacity: 0.6; }
-    }
-
-    .btn-auth-pill {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.75rem;
-      padding: 5px 10px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-
-    .btn-auth-pill:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: #fff;
-    }
-
-    /* Main Grid Viewport */
-    main {
-      height: calc(100vh - 52px);
-      max-width: 1560px;
-      width: 100%;
-      margin: 0 auto;
-      padding: 12px 18px;
-      display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 16px;
-      overflow: hidden;
-    }
-
-    @media (max-width: 960px) {
-      main {
-        grid-template-columns: 1fr;
-        overflow-y: auto;
-      }
-    }
-
-    .card {
-      background: var(--bg-card);
-      backdrop-filter: blur(20px);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 14px 16px;
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-      display: flex;
-      flex-direction: column;
-      position: relative;
-      min-height: 0;
-      height: 100%;
-    }
-
-    /* Left Deck: Compact Player */
-    .player-deck {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      justify-content: space-between;
-      overflow-y: auto;
-      overflow-x: hidden;
-    }
-
-    .voice-status-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 10px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      flex-shrink: 0;
-    }
-
-    .cover-container {
-      width: 100%;
-      max-width: 190px;
-      max-height: 190px;
-      aspect-ratio: 1;
-      margin: 0 auto;
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      position: relative;
-      background: #11121a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      flex-shrink: 1;
-    }
-
-    .cover-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform 0.3s ease;
-    }
-
-    .cover-placeholder {
-      font-size: 46px;
-      color: rgba(255, 255, 255, 0.15);
-    }
-
-    .track-meta {
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      flex-shrink: 0;
-    }
-
-    .track-title {
-      font-size: 1.08rem;
-      font-weight: 700;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .track-artist {
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--accent-secondary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .track-badge-row {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      margin-top: 3px;
-    }
-
-    .curation-pill {
-      font-size: 0.68rem;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(157, 78, 221, 0.15);
-      border: 1px solid rgba(157, 78, 221, 0.3);
-      color: #d8b4fe;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 280px;
-    }
-
-    /* Seeker Section */
-    .seeker-section {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      flex-shrink: 0;
-    }
-
-    .progress-bar-container {
-      width: 100%;
-      height: 5px;
-      background: rgba(255, 255, 255, 0.12);
-      border-radius: 999px;
-      cursor: pointer;
-      position: relative;
-      transition: height 0.15s ease;
-    }
-
-    .progress-bar-container:hover {
-      height: 7px;
-    }
-
-    .progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #9d4edd, #c77dff);
-      width: 0%;
-      border-radius: 999px;
-      box-shadow: 0 0 8px var(--accent-glow);
-      transition: width 0.25s linear;
-    }
-
-    .time-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.72rem;
-      color: var(--text-subtle);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Controls Main */
-    .controls-main {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
-    .btn-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border);
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      font-size: 14px;
-      transition: all 0.2s ease;
-    }
-
-    .btn-icon:hover {
-      background: rgba(255, 255, 255, 0.12);
-      border-color: rgba(255, 255, 255, 0.2);
-      transform: translateY(-1px);
-    }
-
-    .btn-play-pause {
-      width: 44px;
-      height: 44px;
-      background: linear-gradient(135deg, #9d4edd, #6d28d9);
-      border: none;
-      font-size: 16px;
-      color: #fff;
-      box-shadow: 0 4px 14px var(--accent-glow);
-    }
-
-    .btn-play-pause:hover {
-      background: linear-gradient(135deg, #a855f7, #7c3aed);
-      transform: scale(1.05);
-    }
-
-    /* Vibe Feedback Row */
-    .vibe-feedback-row {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-
-    .vibe-btn {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 10px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .vibe-btn:hover {
-      background: rgba(255, 255, 255, 0.09);
-      color: #fff;
-    }
-
-    /* Browser Monitor & Volume */
-    .audio-monitor-btn {
-      width: 100%;
-      padding: 6px 10px;
-      background: rgba(157, 78, 221, 0.08);
-      border: 1px solid rgba(157, 78, 221, 0.25);
-      border-radius: var(--radius-md);
-      font-size: 0.74rem;
-      font-weight: 700;
-      color: #d8b4fe;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all 0.2s;
-      flex-shrink: 0;
-    }
-
-    .audio-monitor-btn.active {
-      background: rgba(157, 78, 221, 0.25);
-      border-color: var(--accent);
-      color: #fff;
-      box-shadow: 0 0 10px var(--accent-glow);
-    }
-
-    .volume-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      flex-shrink: 0;
-    }
-
-    .volume-slider {
-      flex: 1;
-      height: 4px;
-      accent-color: var(--accent);
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      cursor: pointer;
-    }
-
-    /* Right Deck: Tabbed Studio Deck */
-    .hub-deck {
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-      height: 100%;
-      padding: 0;
-      overflow: hidden;
-    }
-
-    .tabs-header {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 10px 14px;
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .tab-btn {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 0.8rem;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .tab-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.05);
-    }
-
-    .tab-btn.active {
-      color: #fff;
-      background: rgba(157, 78, 221, 0.2);
-      border: 1px solid rgba(157, 78, 221, 0.35);
-    }
-
-    .tab-badge {
-      background: rgba(255, 255, 255, 0.12);
-      font-size: 0.68rem;
-      padding: 1px 6px;
-      border-radius: 999px;
-    }
-
-    .tab-panel {
-      display: none;
-      flex: 1;
-      min-height: 0;
-      overflow-y: auto;
-      padding: 12px 14px;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .tab-panel.active {
-      display: flex;
-    }
-
-    /* Panel Content Styles */
-    .panel-top-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.78rem;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-      flex-shrink: 0;
-    }
-
-    .btn-action-small {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--border);
-      color: var(--text-muted);
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 4px 10px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-action-small:hover {
-      background: rgba(255, 255, 255, 0.12);
-      color: #fff;
-    }
-
-    .btn-action-small.danger:hover {
-      background: rgba(239, 68, 68, 0.2);
-      border-color: rgba(239, 68, 68, 0.4);
-      color: #f87171;
-    }
-
-    .up-next-card {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      background: rgba(157, 78, 221, 0.08);
-      border: 1px solid rgba(157, 78, 221, 0.25);
-      border-radius: var(--radius-md);
-      font-size: 0.78rem;
-      flex-shrink: 0;
-    }
-
-    .track-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex: 1;
-    }
-
-    .track-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 7px 10px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      transition: all 0.2s;
-    }
-
-    .track-row:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(255, 255, 255, 0.15);
-    }
-
-    .track-index {
-      font-size: 0.72rem;
-      color: var(--text-subtle);
-      font-family: 'JetBrains Mono', monospace;
-      width: 18px;
-      text-align: center;
-    }
-
-    .track-thumb {
-      width: 34px;
-      height: 34px;
-      border-radius: 6px;
-      object-fit: cover;
-      background: #111;
-      flex-shrink: 0;
-    }
-
-    .track-details {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-
-    .track-row-title {
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .track-row-artist {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .track-row-time {
-      font-size: 0.72rem;
-      color: var(--text-subtle);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .btn-row-del {
-      background: none;
-      border: none;
-      color: var(--text-subtle);
-      cursor: pointer;
-      font-size: 13px;
-      padding: 4px;
-      border-radius: 4px;
-      transition: color 0.2s;
-    }
-
-    .btn-row-del:hover {
-      color: var(--danger);
-    }
-
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 40px 20px;
-      color: var(--text-subtle);
-      gap: 8px;
-      font-size: 0.85rem;
-      text-align: center;
-    }
-
-    /* Settings Box */
-    .settings-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .settings-card {
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 12px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .settings-card-title {
-      font-size: 0.85rem;
-      font-weight: 700;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .settings-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 0.8rem;
-      color: var(--text-muted);
-    }
-
-    /* Modals & Toasts */
-    .modal-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.75);
-      backdrop-filter: blur(8px);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 100;
-      animation: fadeIn 0.2s ease;
-    }
-
-    .modal-box {
-      background: #13141f;
-      border: 1px solid rgba(157, 78, 221, 0.3);
-      border-radius: var(--radius-lg);
-      padding: 20px 24px;
-      width: 100%;
-      max-width: 380px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    .modal-title {
-      font-size: 1.05rem;
-      font-weight: 700;
-      color: #fff;
-    }
-
-    .modal-input {
-      width: 100%;
-      background: rgba(0, 0, 0, 0.4);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      padding: 10px 14px;
-      color: #fff;
-      font-size: 0.88rem;
-      outline: none;
-    }
-
-    .modal-input:focus {
-      border-color: var(--accent);
-    }
-
-    .toast-container {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 200;
-      pointer-events: none;
-    }
-
-    .toast {
-      background: rgba(18, 19, 27, 0.95);
-      border: 1px solid var(--accent);
-      color: #fff;
-      padding: 10px 16px;
-      border-radius: var(--radius-md);
-      font-size: 0.82rem;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
-      animation: toastIn 0.3s ease;
-      pointer-events: auto;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes toastIn {
-      from { transform: translateY(20px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OWRadio — 100% Real Studio Audio Engine</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-
-  <!-- Top Navigation Header -->
-  <header>
+  <header class="topbar">
     <div class="brand">
-      <div class="brand-logo">⚡</div>
+      <div class="brand-icon">⚡</div>
       <div>
         <div class="brand-title">OWRadio</div>
-        <div class="brand-subtitle">Discord &amp; Web Audio Engine</div>
+        <div class="brand-sub">STUDIO MULTI-CLOUD AUDIO ENGINE</div>
       </div>
     </div>
 
-    <!-- Center Command Search Bar -->
-    <div class="header-fast-play">
-      <span class="search-icon">🔍</span>
-      <input 
-        type="text" 
-        id="fastPlayInput" 
-        class="fast-play-input" 
-        placeholder="Search track, artist, album, paste YouTube/Spotify link..." 
-        onkeydown="if(event.key==='Enter') executeFastPlay(true)"
-      />
-      <button class="btn-fast-play" onclick="executeFastPlay(true)" title="Play immediately">▶ Play</button>
-      <button class="btn-fast-queue" onclick="executeFastPlay(false)" title="Add to queue">+ Queue</button>
+    <div class="search-wrap">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input
+          id="searchInput"
+          type="text"
+          placeholder="Search studio track, artist, album, or paste Spotify / YouTube link..."
+          autocomplete="off"
+        />
+        <button id="playQueryBtn" class="btn btn-primary">▶ Play Now</button>
+        <button id="queueQueryBtn" class="btn btn-secondary">+ Queue</button>
+      </div>
+      <div id="searchResultsDropdown" class="search-dropdown hidden"></div>
     </div>
 
-    <div class="nav-right">
-      <div class="status-pill">
-        <div class="pulse-dot"></div>
-        <span id="liveStatusText">LIVE BROADCAST</span>
-      </div>
-      <button class="btn-auth-pill" id="authBtn" onclick="openAuthModal()">
-        <span id="authIcon">🔐</span>
-        <span id="authLabel">Admin</span>
-      </button>
+    <div class="status-pills">
+      <span id="broadcastPill" class="pill pill-live">● LIVE 192K</span>
+      <span id="anchorPill" class="pill pill-anchor">⚓ Anchor: Ready</span>
     </div>
   </header>
 
-  <!-- Main Viewport Grid -->
-  <main>
-    <!-- Left Deck: Compact Player -->
-    <div class="card player-deck">
-      <div class="voice-status-bar">
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span>🔊</span>
-          <span id="voiceStatusText">Broadcasting 24/7</span>
-        </div>
-        <span id="codecBadge" style="font-size:0.68rem; color:var(--text-subtle);">MP3 192k Live</span>
+  <main class="dashboard-grid">
+    <!-- Left Column: Deck 1 Now Playing & Live Stream Player -->
+    <section class="card player-card">
+      <div class="card-header-mini">
+        <span id="deck1Status">🔊 Deck 1 — Studio Broadcast</span>
+        <span id="sourceBadge" class="tag-badge">STUDIO</span>
       </div>
 
-      <div class="cover-container">
-        <img id="trackCover" class="cover-img" src="" alt="Album Art" style="display:none;" />
-        <div id="coverPlaceholder" class="cover-placeholder">🎵</div>
+      <div class="artwork-wrap">
+        <img
+          id="nowPlayingArt"
+          src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"
+          alt="Album Cover"
+        />
       </div>
 
       <div class="track-meta">
-        <div class="track-title" id="trackTitle">Connecting to Station...</div>
-        <div class="track-artist" id="trackArtist">Autonomous Harmonic DJ</div>
-        <div class="track-badge-row">
-          <span class="curation-pill" id="curationPill">✨ DJ Harmonic Chain: Active</span>
+        <h2 id="nowPlayingTitle">Ready to Broadcast</h2>
+        <div id="nowPlayingArtist" class="track-artist">Search any song or pick a chart track</div>
+        <div id="nowPlayingAlbum" class="track-album"></div>
+        <div id="vibeReasonBadge" class="vibe-reason">⚓ Multi-Cloud Studio Engine</div>
+      </div>
+
+      <div class="progress-section">
+        <div class="progress-bar-bg">
+          <div id="progressFill" class="progress-bar-fill"></div>
+        </div>
+        <div class="progress-times">
+          <span id="elapsedTime">0:00</span>
+          <span id="totalDuration">0:00</span>
         </div>
       </div>
 
-      <!-- Seeker Section -->
-      <div class="seeker-section">
-        <div class="progress-bar-container" id="progressBar" onclick="onSeekerClick(event)" title="Click to seek">
-          <div class="progress-bar-fill" id="progressFill"></div>
-        </div>
-        <div class="time-labels">
-          <span id="timeElapsed">0:00</span>
-          <span id="timeTotal">0:00</span>
-        </div>
+      <div class="transport-controls">
+        <button id="stopBtn" class="icon-btn" title="Stop & Clear">⏹</button>
+        <button id="playPauseBtn" class="play-main-btn" title="Play / Pause">▶</button>
+        <button id="skipBtn" class="icon-btn" title="Skip to Deck 2">⏭</button>
       </div>
 
-      <!-- Center Controls -->
-      <div class="controls-main">
-        <button class="btn-icon" title="Stop Playback" onclick="sendPlayerAction('stop')">⏹</button>
-        <button class="btn-icon" title="Shuffle Queue" onclick="sendPlayerAction('shuffle')">🔀</button>
-        <button class="btn-icon btn-play-pause" id="btnPlayPause" title="Play / Pause" onclick="togglePlayPause()">▶</button>
-        <button class="btn-icon" title="Skip Track" onclick="sendPlayerAction('skip')">⏭</button>
+      <div class="vote-controls">
+        <button id="likeBtn" class="btn-chip">👍 Lock Vibe</button>
+        <button id="dislikeBtn" class="btn-chip">👎 Skip &amp; Cool</button>
       </div>
 
-      <!-- Vibe Feedback -->
-      <div class="vibe-feedback-row">
-        <button class="vibe-btn" onclick="sendPlayerAction('like')" title="Thumbs Up: Play more like this artist">
-          👍 <span>Love Vibe</span>
-        </button>
-        <button class="vibe-btn" onclick="sendPlayerAction('dislike')" title="Thumbs Down: Skip and avoid artist">
-          👎 <span>Skip &amp; Cool</span>
-        </button>
-      </div>
+      <button id="listenLiveBtn" class="btn-listen">🎧 Listen Live in Browser (192kbps)</button>
+      <audio id="browserAudio" preload="none"></audio>
 
-      <!-- Browser Audio Monitor -->
-      <button class="audio-monitor-btn" id="btnBrowserAudio" onclick="toggleBrowserAudio()">
-        <span>🎧</span> <span id="browserAudioLabel">Listen Live in Browser</span>
-      </button>
-      <audio id="browserAudioElement" src="/stream.mp3" preload="none"></audio>
-
-      <!-- Volume Row -->
       <div class="volume-row">
-        <span id="volIcon" style="cursor:pointer;" onclick="toggleMute()">🔊</span>
-        <input type="range" class="volume-slider" id="volSlider" min="0" max="100" value="80" oninput="onVolumeChange(this.value)" />
-        <span id="volPct" style="width:34px; text-align:right;">80%</span>
+        <span id="muteIcon" class="vol-icon" title="Mute / Unmute">🔊</span>
+        <input id="volumeSlider" type="range" min="0" max="100" value="85" />
+        <span id="volumeLabel" class="vol-label">85%</span>
       </div>
-    </div>
+    </section>
 
-    <!-- Right Deck: Tabbed Studio Deck -->
-    <div class="card hub-deck">
-      <div class="tabs-header">
-        <button class="tab-btn active" id="tabBtnQueue" onclick="switchHubTab('queue')">
-          <span>📑 Queue</span> <span class="tab-badge" id="queueBadge">0</span>
-        </button>
-        <button class="tab-btn" id="tabBtnHistory" onclick="switchHubTab('history')">
-          <span>🕒 History</span>
-        </button>
-        <button class="tab-btn" id="tabBtnListeners" onclick="switchHubTab('listeners')">
-          <span>🎙️ Listeners</span> <span class="tab-badge" id="listenersBadge">0</span>
-        </button>
-        <button class="tab-btn" id="tabBtnSettings" onclick="switchHubTab('settings')">
-          <span>⚙️ Settings</span>
-        </button>
-      </div>
-
-      <!-- Queue Tab -->
-      <div class="tab-panel active" id="panelQueue">
-        <div class="panel-top-bar">
-          <span id="queueSummaryText">0 songs in queue</span>
-          <div style="display:flex; gap:6px;">
-            <button class="btn-action-small" onclick="sendPlayerAction('shuffle')">🔀 Shuffle</button>
-            <button class="btn-action-small danger" onclick="clearQueue()">🗑 Clear Queue</button>
-          </div>
+    <!-- Right Column: Triple-Deck Queue, History, Official Charts, and Vibe Engine Controls -->
+    <section class="card main-panel">
+      <div class="tabs-bar">
+        <div class="tabs-left">
+          <button class="tab-btn active" data-tab="queue">Queue &amp; Decks <span id="queueCount" class="count-pill">0</span></button>
+          <button class="tab-btn" data-tab="charts">Official Charts (UK/US)</button>
+          <button class="tab-btn" data-tab="history">History</button>
+          <button class="tab-btn" data-tab="vibe">Vibe Engine 🎛️</button>
         </div>
-
-        <div class="up-next-card" id="upNextCard" style="display:none;">
-          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
-            <span style="width:7px; height:7px; border-radius:50%; background:#22c55e; flex-shrink:0;"></span>
-            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-              <strong style="color:#4ade80;">Up Next:</strong> <span id="upNextTitle" style="color:var(--text);"></span>
-            </span>
-          </div>
-          <span style="font-size:0.68rem; color:var(--text-subtle); flex-shrink:0;">⚡ HARMONIC CUE</span>
-        </div>
-
-        <div class="track-list" id="queueListContainer">
-          <!-- Populated by JS -->
+        <div class="tabs-right">
+          <button id="clearQueueBtn" class="btn btn-small">Clear Queue</button>
         </div>
       </div>
 
-      <!-- History Tab -->
-      <div class="tab-panel" id="panelHistory">
-        <div class="panel-top-bar">
-          <span>Recently Played Tracks</span>
-          <button class="btn-action-small" onclick="fetchStationData()">🔄 Refresh</button>
-        </div>
-        <div class="track-list" id="historyListContainer">
-          <!-- Populated by JS -->
-        </div>
+      <div id="deck2Banner" class="deck-banner hidden">
+        <span class="deck-dot"></span>
+        <span id="deck2Text">Deck 2 Ready: —</span>
+        <span id="deck2PrewarmTag" class="deck-tag">PRE-WARMED</span>
       </div>
 
-      <!-- Listeners Tab -->
-      <div class="tab-panel" id="panelListeners">
-        <div class="panel-top-bar">
-          <span>Active Listeners (Discord &amp; Web)</span>
-        </div>
-        <div class="track-list" id="listenersListContainer">
-          <!-- Populated by JS -->
-        </div>
+      <!-- Tab: Queue -->
+      <div id="tab-queue" class="tab-pane active">
+        <div id="queueList" class="track-list"></div>
       </div>
 
-      <!-- Settings Tab -->
-      <div class="tab-panel" id="panelSettings">
-        <div class="settings-grid">
-          <div class="settings-card">
-            <div class="settings-card-title">🤖 Autonomous Harmonic DJ Engine</div>
-            <div class="settings-row">
-              <span>Automatic Continuity Chaining:</span>
-              <strong style="color:#4ade80;">Active (Continuous Musical Peers)</strong>
-            </div>
-            <div class="settings-row">
-              <span>Anti-Junk Shield:</span>
-              <span style="color:var(--text-muted);">Blocking meme/sped-up edits &amp; type beats</span>
+      <!-- Tab: Official UK/US Charts -->
+      <div id="tab-charts" class="tab-pane hidden">
+        <div class="chart-toolbar">
+          <button class="btn btn-small chart-country-btn active" data-country="gb">🇬🇧 UK Official Top 40</button>
+          <button class="btn btn-small chart-country-btn" data-country="us">🇺🇸 US Hot 40</button>
+        </div>
+        <div id="chartsList" class="track-list"></div>
+      </div>
+
+      <!-- Tab: History -->
+      <div id="tab-history" class="tab-pane hidden">
+        <div id="historyList" class="track-list"></div>
+      </div>
+
+      <!-- Tab: Vibe Engine Settings -->
+      <div id="tab-vibe" class="tab-pane hidden">
+        <div class="vibe-settings-grid">
+          <div class="setting-box">
+            <h3>Vibe Progression Mode</h3>
+            <p class="setting-desc">Controls how Autoplay transitions from your Anchor Artist.</p>
+            <div class="radio-group" id="vibeModeGroup">
+              <button class="choice-btn active" data-mode="balanced">⚓ Balanced (Anchor + Related)</button>
+              <button class="choice-btn" data-mode="deep_dive">🎯 Deep Dive (Same Artist Catalog)</button>
+              <button class="choice-btn" data-mode="collabs">🤝 Collabs &amp; Immediate Circle</button>
+              <button class="choice-btn" data-mode="discovery">🚀 Wild Discovery</button>
             </div>
           </div>
 
-          <div class="settings-card">
-            <div class="settings-card-title">📻 Live Broadcast Relay</div>
-            <div class="settings-row">
-              <span>Stream URL:</span>
-              <code style="color:#c77dff; font-size:0.75rem;">/stream.mp3</code>
-            </div>
-            <div class="settings-row">
-              <span>Bitrate:</span>
-              <span>192 kbps Constant Stereo MP3</span>
-            </div>
-          </div>
-
-          <div class="settings-card">
-            <div class="settings-card-title">🔐 Administration</div>
-            <div class="settings-row">
-              <span>Access Level:</span>
-              <span id="adminStatusDisplay">Guest (Free to Queue Songs)</span>
-            </div>
-            <div style="margin-top:6px;">
-              <button class="btn-action-small" id="settingsAuthActionBtn" onclick="openAuthModal()">Admin Login</button>
+          <div class="setting-box">
+            <h3>Catalog &amp; Radio Source</h3>
+            <p class="setting-desc">100% real music databases — zero fake hashes.</p>
+            <div class="radio-group" id="vibeEngineGroup">
+              <button class="choice-btn active" data-engine="auto">⚡ Auto Multi-Cloud (Deezer + YTMusic + Apple)</button>
+              <button class="choice-btn" data-engine="deezer">📻 Deezer Artist Radio &amp; Related (3k+ Fans)</button>
+              <button class="choice-btn" data-engine="ytmusic">🎵 YouTube Music Studio Radio (WEB_REMIX)</button>
+              <button class="choice-btn" data-engine="musicbrainz">🏛️ MusicBrainz Canonical Studio Albums</button>
+              <button class="choice-btn" data-engine="charts">🔥 Official UK/US Top 40 Rotation</button>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
   </main>
-
-  <!-- Admin Login Modal -->
-  <div class="modal-overlay" id="authModal" onclick="if(event.target===this) closeAuthModal()">
-    <div class="modal-box">
-      <div class="modal-title">🔐 Admin Authentication</div>
-      <p style="font-size:0.78rem; color:var(--text-muted);">Enter the station admin password to unlock full playback control (skip, pause, volume, stop).</p>
-      <input type="password" id="adminPasswordInput" class="modal-input" placeholder="Admin password..." onkeydown="if(event.key==='Enter') submitAdminLogin()" />
-      <div id="authErrorMsg" style="display:none; color:var(--danger); font-size:0.75rem;"></div>
-      <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button class="btn-action-small" onclick="closeAuthModal()">Cancel</button>
-        <button class="btn-fast-play" onclick="submitAdminLogin()">Sign In</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Container -->
-  <div class="toast-container" id="toastContainer"></div>
 
   <script src="/app.js"></script>
 </body>

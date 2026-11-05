@@ -1,969 +1,285 @@
-import collaborativeGraph from '../services/collaborativeGraph.js';
 /**
- * @file server.ts
- * @description Embedded Hono HTTP server running on port 8091 with CORS enabled.
- * Provides /stream.mp3 live VLC audio broadcast, /api/nowplaying (<600B JSON),
- * /api/queue, /api/events (SSE), and serves the dark-mode web dashboard.
+ * @file web/server.ts
+ * @description Clean Hono Web Server & REST/SSE API for OWRadio.
+ * Serves:
+ * - /stream.mp3 (Continuous 192kbps live MP3 audio broadcast)
+ * - /api/nowplaying & /api/events (Live state + Triple-Deck status)
+ * - /api/search (Multi-catalog YouTube Music WEB_REMIX + Deezer + iTunes studio search)
+ * - /api/play & /api/queue (Play Now / Queue with Spotify & YouTube URL support)
+ * - /api/player/volume & /api/player/:action (Transport controls)
+ * - /api/vibe & /api/charts (Real Vibe Mode / Engine configuration & UK/US Top 40 Charts)
  */
 
-import { Hono, type Context } from 'hono';
-import { cors } from 'hono/cors';
-import { streamSSE } from 'hono/streaming';
-import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { PassThrough } from 'node:stream';
+import { stream, streamSSE } from 'hono/streaming';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import config from '../config.js';
+import globalPlayer from '../player/GuildPlayer.js';
+import AudioTrack from '../player/AudioTrack.js';
+import { searchStudioCatalog, resolveQueryToTracks } from '../services/searchService.js';
+import { getOfficialCharts } from '../services/itunes.js';
+import { getArtistCategorizedDiscography } from '../services/musicbrainz.js';
+import { VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
 import authService from './auth.js';
-import type { GuildPlayer } from '../player/GuildPlayer.js';
-import { AudioTrack } from '../player/AudioTrack.js';
-import youtube from '../services/youtube.js';
-import deezer from '../services/deezer.js';
-import linkParser from '../services/linkParser.js';
-import musicbrainz from '../services/musicbrainz.js';
-import curator from '../services/curator.js';
-import playlistParser from '../services/playlistParser.js';
-import harmonicMixing from '../services/harmonicMixing.js';
-import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../utils/trackDedupe.js';
-import dynamicSettings from '../services/dynamicSettings.js';
-import vetoService from '../services/vetoService.js';
-import baselineService from '../services/baselineService.js';
-import { sqlite, getBotState } from '../db/index.js';
-import { executeAutoResume } from '../bot/autoResume.js';
 
-export function createWebServer(player: GuildPlayer) {
-  const app = new Hono();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const publicDir = path.join(__dirname, 'public');
 
-  // Enable open CORS for IoT devices, scripts, and local web dashboards
-  app.use('*', cors());
+export const app = new Hono();
 
-  // --- 1. GET /stream.mp3 (VLC / Browser Audio Stream) ---
-  app.get('/stream.mp3', (c) => {
-    c.header('Content-Type', 'audio/mpeg');
-    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    c.header('Connection', 'keep-alive');
-    c.header('Pragma', 'no-cache');
-    c.header('Expires', '0');
-    c.header('icy-name', 'OWRadio Live Radio');
-    c.header('icy-genre', 'Eclectic Curation');
-    c.header('icy-br', '192');
+function checkAdmin(c: any): boolean {
+  if (!authService.isAuthEnabled()) return true;
+  const authHeader = c.req.header('Authorization') || '';
+  const token = authHeader.replace(/^Bearer\s+/i, '').trim();
+  const verified = authService.verifySessionToken(token);
+  return verified.valid;
+}
 
-    const clientStream = new PassThrough();
-    player.broadcastTee.addHttpClient(clientStream);
+// --- Static Web Dashboard Assets ---
+app.get('/', (c) => {
+  const html = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf-8');
+  return c.html(html);
+});
 
-    c.req.raw.signal.addEventListener('abort', () => {
-      player.broadcastTee.removeHttpClient(clientStream);
-      clientStream.destroy();
+app.get('/app.js', (c) => {
+  const js = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf-8');
+  return c.text(js, 200, { 'Content-Type': 'application/javascript; charset=utf-8' });
+});
+
+app.get('/style.css', (c) => {
+  const cssPath = path.join(publicDir, 'style.css');
+  if (fs.existsSync(cssPath)) {
+    return c.text(fs.readFileSync(cssPath, 'utf-8'), 200, { 'Content-Type': 'text/css; charset=utf-8' });
+  }
+  return c.text('', 200, { 'Content-Type': 'text/css' });
+});
+
+// --- Continuous 192kbps MP3 Audio Broadcast ---
+app.get('/stream.mp3', (c) => {
+  c.header('Content-Type', 'audio/mpeg');
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Connection', 'keep-alive');
+  c.header('icy-name', 'OWRadio Studio Stream');
+
+  return stream(c, async (s) => {
+    const mp3Client = globalPlayer.broadcastTee.addMp3Client();
+    s.onAbort(() => {
+      mp3Client.destroy();
     });
-
-    return c.body(clientStream as any);
+    for await (const chunk of mp3Client) {
+      await s.write(chunk as Uint8Array);
+    }
   });
+});
 
-  // --- Authentication Middleware ---
-  const requireAdminAuth = async (c: any, next: any) => {
-    if (!authService.isAuthEnabled()) {
-      return next();
-    }
+// --- Live State & SSE Telemetry ---
+app.get('/api/nowplaying', (c) => {
+  return c.json(globalPlayer.getStateSnapshot());
+});
 
-    let token = getCookie(c, 'owradio_session');
-    const authHeader = c.req.header('authorization');
-    if (!token && authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7).trim();
-    }
-
-    if (!token) {
-      return c.json({ error: 'Admin authentication required', code: 'AUTH_REQUIRED' }, 401);
-    }
-
-    const verification = authService.verifySessionToken(token);
-    if (!verification.valid) {
-      return c.json({ error: 'Invalid or expired session token', code: 'INVALID_TOKEN' }, 401);
-    }
-
-    c.set('authSession', verification.session);
-    return next();
-  };
-
-  const checkIsAdmin = (c: Context): boolean => {
-    if (!authService.isAuthEnabled()) return true;
-    let token = getCookie(c, 'owradio_session');
-    const authHeader = c.req.header('authorization');
-    if (!token && authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7).trim();
-    }
-    if (!token) return false;
-    return authService.verifySessionToken(token).valid;
-  };
-
-  // --- Auth API Endpoints ---
-  app.get('/api/auth/status', (c) => {
-    const isEnabled = authService.isAuthEnabled();
-    const authMode = authService.getAuthMode();
-    let token = getCookie(c, 'owradio_session');
-    const authHeader = c.req.header('authorization');
-    if (!token && authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7).trim();
-    }
-    const verification = token ? authService.verifySessionToken(token) : { valid: false };
-    return c.json({
-      enabled: isEnabled,
-      authMode,
-      authenticated: !isEnabled || verification.valid,
-      user: verification.session?.user || null,
-      supabaseConfig: (authMode === 'supabase' || authMode === 'both') ? {
-        url: config.SUPABASE_URL,
-        anonKey: config.SUPABASE_ANON_KEY,
-      } : null,
-    });
-  });
-
-  app.post('/api/auth/login', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const password = body.password;
-    if (!password || typeof password !== 'string') {
-      return c.json({ error: 'Password is required' }, 400);
-    }
-
-    if (!authService.verifyAdminPassword(password)) {
-      return c.json({ error: 'Incorrect admin password' }, 401);
-    }
-
-    const token = authService.createSessionToken('password', { name: 'Admin', role: 'admin' });
-    setCookie(c, 'owradio_session', token, {
-      path: '/',
-      httpOnly: false,
-      sameSite: 'Lax',
-      maxAge: 7 * 24 * 3600,
-    });
-
-    return c.json({ success: true, token, role: 'admin' });
-  });
-
-  app.post('/api/auth/supabase-verify', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const accessToken = body.accessToken || body.access_token;
-    if (!accessToken || typeof accessToken !== 'string') {
-      return c.json({ error: 'Access token is required' }, 400);
-    }
-
-    const result = await authService.verifySupabaseToken(accessToken);
-    if (!result.valid) {
-      return c.json({ error: 'Invalid Google OAuth token' }, 401);
-    }
-
-    const token = authService.createSessionToken('supabase', result.user);
-    setCookie(c, 'owradio_session', token, {
-      path: '/',
-      httpOnly: false,
-      sameSite: 'Lax',
-      maxAge: 7 * 24 * 3600,
-    });
-
-    return c.json({ success: true, token, user: result.user, role: 'admin' });
-  });
-
-  app.post('/api/auth/logout', (c) => {
-    deleteCookie(c, 'owradio_session', { path: '/' });
-    return c.json({ success: true });
-  });
-
-  // --- 2. GET /api/nowplaying (<600 bytes JSON for IoT/ESP32) ---
-  app.get('/api/nowplaying', (c) => {
-    const host = c.req.header('host') || `127.0.0.1:${config.WEB_PORT}`;
-    const protocol = c.req.header('x-forwarded-proto') || 'http';
-    const baseUrl = `${protocol}://${host}`;
-
-    const state = player.getStatePayload(baseUrl);
-    return c.json(state);
-  });
-
-  // --- 3. GET /api/queue ---
-  app.get('/api/queue', (c) => {
-    const state = player.getStatePayload();
-    const upcoming = player.getQueueList().map((t) => t.toQueueJson());
-
-    // Fetch last 10 tracks from history
-    const recentHistory = sqlite.prepare(`
-      SELECT ph.id, s.title, ph.artist_name as artist, ph.played_at, ph.requested_by, ph.is_manual_request
-      FROM playback_history ph
-      JOIN songs s ON s.id = ph.song_id
-      ORDER BY ph.played_at DESC
-      LIMIT 10
-    `).all();
-
-    // Fetch active room affinities
-    const activeUserIds = player.getActiveListenerUserIds();
-    let roomAffinities: any[] = [];
-    if (activeUserIds.length > 0) {
-      const placeholders = activeUserIds.map(() => '?').join(',');
-      roomAffinities = sqlite.prepare(`
-        SELECT target_key, target_type, display_name, SUM(affinity_score) as total_affinity
-        FROM user_preferences
-        WHERE user_id IN (${placeholders})
-        GROUP BY target_type, target_key
-        ORDER BY total_affinity DESC
-        LIMIT 10
-      `).all(...activeUserIds);
-    }
-
-    return c.json({
-      currentTrack: state.track,
-      state: state.state,
-      volume: state.volume,
-      upcoming,
-      recentHistory,
-      roomAffinities,
-      roomListeners: state.roomListeners,
-    });
-  });
-
-  // --- 4. Queue Addition Handler (Public - Open to all users!) ---
-  const handleQueueAdd = async (c: Context) => {
-    const body = await c.req.json().catch(() => ({}));
-    const query = body.query?.trim();
-    const mode = body.mode || 'song';
-    const isAdmin = checkIsAdmin(c);
-    const playNow = Boolean(body.playNow) && isAdmin;
-    const hadCurrentTrackBefore = Boolean(player.currentTrack);
-
-    if (playNow) {
-      player.purgeAutoplayTracks();
-    }
-
-    const maybePlayNow = () => {
-      if (playNow && hadCurrentTrackBefore) {
-        player.skip(body.userId || 'web_dashboard');
-        if (player.autoplayEnabled) {
-          void player.replenishAutoplayBuffer();
-        }
-      }
+app.get('/api/events', (c) => {
+  return streamSSE(c, async (sse) => {
+    let alive = true;
+    const sendSnapshot = async () => {
+      if (!alive) return;
+      try {
+        await sse.writeSSE({
+          event: 'state',
+          data: JSON.stringify(globalPlayer.getStateSnapshot()),
+        });
+      } catch {}
     };
 
-    if (!query) {
-      return c.json({ error: 'Missing "query" parameter' }, 400);
-    }
+    await sendSnapshot();
+    const onUpdate = () => void sendSnapshot();
+    globalPlayer.on('stateUpdate', onUpdate);
+    const timer = setInterval(onUpdate, 1000);
 
-    if (mode === 'vibe') {
-      const related = await collaborativeGraph.getRelatedArtists(query, 5);
-      const artistsToQuery = related.length > 0 ? related.map((r: any) => r.name) : [query];
-      const vibeItems = await collaborativeGraph.getDeepCutsForArtists(artistsToQuery, 5, 2);
-
-      const queuedSongIds = new Set<string>();
-      const queuedArtists = new Set<string>();
-      const queuedDedupeKeys = new Set<string>();
-      const queuedLanguages = new Set<string>();
-
-      if (player.currentTrack) {
-        queuedSongIds.add(player.currentTrack.id);
-        queuedArtists.add(player.currentTrack.artist.toLowerCase());
-        const normCur = normalizeArtist(player.currentTrack.artist).replace(/\s+/g, '');
-        if (normCur) queuedArtists.add(normCur);
-        queuedDedupeKeys.add(getTrackDedupeKey(player.currentTrack.title, player.currentTrack.artist));
-        const lang = 'en';
-        if (lang !== 'en') queuedLanguages.add(lang);
-      }
-
-      for (const q of player.getQueueList()) {
-        queuedSongIds.add(q.id);
-        queuedArtists.add(q.artist.toLowerCase());
-        const normQ = normalizeArtist(q.artist).replace(/\s+/g, '');
-        if (normQ) queuedArtists.add(normQ);
-        queuedDedupeKeys.add(getTrackDedupeKey(q.title, q.artist));
-        const lang = 'en';
-        if (lang !== 'en') queuedLanguages.add(lang);
-      }
-
-      let count = 0;
-      for (const item of vibeItems) {
-        const itemNormArtist = normalizeArtist(item.artist).replace(/\s+/g, '');
-        if (itemNormArtist && queuedArtists.has(itemNormArtist)) {
-          continue;
-        }
-
-        // Search YouTube first
-        const ytResults = await youtube.searchTracks(`${item.artist} ${item.title}`, 1);
-        const ytCandidate = ytResults[0];
-
-        if (ytCandidate) {
-          const candKey = getTrackDedupeKey(ytCandidate.title, ytCandidate.artist);
-          const candNorm = normalizeArtist(ytCandidate.artist).replace(/\s+/g, '');
-
-          if (
-            !queuedDedupeKeys.has(candKey) &&
-            (!candNorm || !queuedArtists.has(candNorm)) &&
-            curator.isTrackEligibleForAutoplay(
-              ytCandidate.id,
-              ytCandidate.artist,
-              queuedSongIds,
-              queuedArtists,
-              ytCandidate.title,
-              queuedDedupeKeys,
-              undefined,
-              queuedLanguages
-            )
-          ) {
-            const track = AudioTrack.fromYouTube(ytCandidate, 'web_dashboard', true, 'AI Vibe Mix', (item as any).reason || 'Vibe match');
-            await player.enqueue(track);
-            queuedSongIds.add(ytCandidate.id);
-            queuedArtists.add(ytCandidate.artist.toLowerCase());
-            if (candNorm) queuedArtists.add(candNorm);
-            if (itemNormArtist) queuedArtists.add(itemNormArtist);
-            queuedDedupeKeys.add(candKey);
-            const candLang = 'en';
-            if (candLang !== 'en') queuedLanguages.add(candLang);
-            count++;
-            continue;
-          }
-        }
-
-        const results = await deezer.searchTracks(`${item.artist} ${item.title}`, 1);
-        const meta = results[0];
-        if (meta) {
-          const metaKey = getTrackDedupeKey(meta.title, meta.artist);
-          const metaNorm = normalizeArtist(meta.artist).replace(/\s+/g, '');
-
-          if (
-            !queuedDedupeKeys.has(metaKey) &&
-            (!metaNorm || !queuedArtists.has(metaNorm)) &&
-            curator.isTrackEligibleForAutoplay(
-              meta.id,
-              meta.artist,
-              queuedSongIds,
-              queuedArtists,
-              meta.title,
-              queuedDedupeKeys,
-              meta.durationSec,
-              queuedLanguages
-            )
-          ) {
-            const track = AudioTrack.fromDeezer(meta, 'web_dashboard', true, 'AI Vibe Mix', (item as any).reason || 'Vibe match');
-            await player.enqueue(track);
-            queuedSongIds.add(meta.id);
-            queuedArtists.add(meta.artist.toLowerCase());
-            if (metaNorm) queuedArtists.add(metaNorm);
-            if (itemNormArtist) queuedArtists.add(itemNormArtist);
-            queuedDedupeKeys.add(metaKey);
-            const metaLang = 'en';
-            if (metaLang !== 'en') queuedLanguages.add(metaLang);
-            count++;
-          }
-        }
-      }
-      maybePlayNow();
-      return c.json({ success: true, enqueuedCount: count, mode: 'vibe' });
-    }
-
-    // Default song or link
-    const parsed = linkParser.parseMusicLink(query);
-
-    // YouTube Playlist
-    if (parsed?.provider === 'youtube' && (parsed.type === 'playlist' || parsed.playlistId)) {
-      const playlistId = parsed.playlistId || parsed.id;
-      const ytTracks = await youtube.getPlaylistTracks(playlistId, 50);
-      const tracks = ytTracks.map((meta) =>
-        AudioTrack.fromYouTube(
-          meta,
-          'web_dashboard',
-          true,
-          'User Request',
-          'Web Dashboard',
-          'playlist',
-          `yt_pl_${playlistId}`,
-          'YouTube Playlist'
-        )
-      );
-      const enqueuedCount = await player.enqueueBatch(tracks, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, enqueuedCount, provider: 'youtube', type: 'playlist' });
-    }
-
-    // YouTube Single Track
-    if (parsed?.provider === 'youtube' && parsed.type === 'track') {
-      const ytMeta = await youtube.getTrack(parsed.id);
-      if (!ytMeta) {
-        return c.json({ error: `Could not resolve YouTube video: ${query}` }, 404);
-      }
-      const track = AudioTrack.fromYouTube(ytMeta, 'web_dashboard', true, 'User Request', undefined, 'single');
-      await player.enqueue(track, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, track: track.toNowPlayingJson(0) });
-    }
-
-    // Deezer Album
-    if (parsed?.provider === 'deezer' && parsed.type === 'album') {
-      const albumTracks = await deezer.getAlbumTracks(parsed.id);
-      const tracks = albumTracks.map((meta) =>
-        AudioTrack.fromDeezer(
-          meta,
-          'web_dashboard',
-          true,
-          'User Request',
-          'Web Dashboard',
-          'playlist',
-          `dz_album_${parsed.id}`,
-          'Deezer Album'
-        )
-      );
-      const enqueuedCount = await player.enqueueBatch(tracks, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, enqueuedCount });
-    }
-
-    // Deezer Playlist
-    if (parsed?.provider === 'deezer' && parsed.type === 'playlist') {
-      const playlistTracks = await deezer.getPlaylistTracks(parsed.id);
-      const tracks = playlistTracks.map((meta) =>
-        AudioTrack.fromDeezer(
-          meta,
-          'web_dashboard',
-          true,
-          'User Request',
-          'Web Dashboard',
-          'playlist',
-          `dz_pl_${parsed.id}`,
-          'Deezer Playlist'
-        )
-      );
-      const enqueuedCount = await player.enqueueBatch(tracks, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, enqueuedCount });
-    }
-
-    // Deezer Single Track
-    if (parsed?.provider === 'deezer' && parsed.type === 'track') {
-      const dzMeta = await deezer.getTrack(parsed.id);
-      if (!dzMeta) {
-        return c.json({ error: `Could not resolve Deezer track: ${query}` }, 404);
-      }
-      const track = AudioTrack.fromDeezer(dzMeta, 'web_dashboard', true, 'User Request', undefined, 'single');
-      await player.enqueue(track, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, track: track.toNowPlayingJson(0) });
-    }
-
-    // Freeform text query: Prioritize YouTube Search (99% YouTube)
-    const ytResults = await youtube.searchTracks(query, 1);
-    if (ytResults.length > 0) {
-      const track = AudioTrack.fromYouTube(ytResults[0], 'web_dashboard', true, 'YouTube Search', undefined, 'single');
-      await player.enqueue(track, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, track: track.toNowPlayingJson(0) });
-    }
-
-    // Fallback to Deezer search
-    const dzResults = await deezer.searchTracks(query, 1);
-    if (dzResults.length > 0) {
-      const track = AudioTrack.fromDeezer(dzResults[0], 'web_dashboard', true, 'User Request', undefined, 'single');
-      await player.enqueue(track, playNow && hadCurrentTrackBefore);
-      maybePlayNow();
-      return c.json({ success: true, track: track.toNowPlayingJson(0) });
-    }
-
-    return c.json({ error: `Could not resolve track: ${query}` }, 404);
-  };
-
-  // Register Public Queue Endpoints (Unauthenticated guests can search & queue songs)
-  app.post('/api/queue/add', handleQueueAdd);
-  app.post('/api/player/queue', handleQueueAdd);
-
-  // --- Click to Jump / Skip to specific track in queue ---
-  app.post('/api/player/skip-to', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const index = typeof body.index === 'number' ? body.index : undefined;
-    const id = typeof body.id === 'string' ? body.id : undefined;
-    const target = index !== undefined ? index : id;
-    if (target === undefined) {
-      return c.json({ error: 'Missing "index" or "id" to skip to' }, 400);
-    }
-    const success = await player.jumpToQueueIndex(target);
-    return c.json({ success, state: player.getStatePayload() });
-  });
-
-  // --- Instant Veto Currently Playing Track & Skip ---
-  app.post('/api/player/veto-current', requireAdminAuth, (c) => {
-    const current = player.currentTrack;
-    if (!current) return c.json({ error: 'Nothing is currently playing' }, 400);
-    vetoService.addVeto('artist', current.artist, 'manual_admin');
-    player.skip();
-    return c.json({ success: true, message: `Vetoed artist "${current.artist}" and skipped track.` });
-  });
-
-  // --- Veto / Blacklist Management Endpoints ---
-  app.get('/api/vetoes', (c) => {
-    return c.json({ vetoes: vetoService.getAllVetoes() });
-  });
-
-  app.post('/api/vetoes/add', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const { targetType, name } = body;
-    if (!targetType || !name) return c.json({ error: 'Missing targetType or name' }, 400);
-    vetoService.addVeto(targetType, name, 'manual_admin');
-    if (player.currentTrack && (vetoService.isArtistVetoed(player.currentTrack.artist) || vetoService.isSongVetoed(player.currentTrack.title, player.currentTrack.artist))) {
-      player.skip();
-    }
-    return c.json({ success: true, vetoes: vetoService.getAllVetoes() });
-  });
-
-  app.post('/api/vetoes/remove', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const { id, key } = body;
-    const target = id !== undefined ? id : key;
-    if (target === undefined) return c.json({ error: 'Missing id or key' }, 400);
-    vetoService.removeVeto(target);
-    if (typeof target === 'string') {
-      sqlite.prepare("DELETE FROM user_preferences WHERE target_key = ? AND dislikes > 0").run(target.toLowerCase().trim());
-    }
-    return c.json({ success: true, vetoes: vetoService.getAllVetoes() });
-  });
-
-  app.post('/api/vetoes/pop', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const { id, key } = body;
-    const target = id !== undefined ? id : key;
-    if (target === undefined) return c.json({ error: 'Missing id or key' }, 400);
-    vetoService.removeVeto(target);
-    if (typeof target === 'string') {
-      sqlite.prepare("DELETE FROM user_preferences WHERE target_key = ? AND dislikes > 0").run(target.toLowerCase().trim());
-    }
-    return c.json({ success: true, vetoes: vetoService.getAllVetoes() });
-  });
-
-  // --- Wipe Taste Preferences (Requires re-entering Admin Password or Valid Admin Session) ---
-  app.post('/api/preferences/wipe', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const provided = String(body.password || body.adminPassword || '');
-    const isAdmin = checkIsAdmin(c);
-
-    let isAuthorized = false;
-    if (!authService.isAuthEnabled()) {
-      isAuthorized = true;
-    } else if (provided && authService.verifyAdminPassword(provided)) {
-      isAuthorized = true;
-    } else if (isAdmin && (!config.ADMIN_PASSWORD || authService.verifyAdminPassword(provided))) {
-      isAuthorized = true;
-    }
-
-    if (!isAuthorized) {
-      return c.json({ error: 'Invalid admin credentials. Authentication failed.' }, 401);
-    }
-    sqlite.prepare('DELETE FROM user_preferences').run();
-    return c.json({ success: true, message: 'Taste preferences successfully wiped.' });
-  });
-
-  // --- Quick Pop Individual Taste Preference ---
-  app.post('/api/preferences/pop', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const { targetType, targetKey } = body;
-    if (!targetType || !targetKey) return c.json({ error: 'Missing targetType or targetKey' }, 400);
-    sqlite.prepare('DELETE FROM user_preferences WHERE target_type = ? AND target_key = ?').run(targetType, targetKey);
-    return c.json({ success: true });
-  });
-
-  // --- Station DNA / Baseline Preferences (Editable in Web Studio) ---
-  app.get('/api/baseline', (c) => {
-    return c.json({
-      success: true,
-      baseline: baselineService.getBaseline(),
+    sse.onAbort(() => {
+      alive = false;
+      clearInterval(timer);
+      globalPlayer.off('stateUpdate', onUpdate);
     });
-  });
 
-  app.post('/api/baseline', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const artists = Array.isArray(body.artists) ? body.artists : undefined;
-    const genres = Array.isArray(body.genres) ? body.genres : undefined;
-    const weight = typeof body.weight === 'number' ? body.weight : undefined;
-
-    if (!artists && !genres && weight === undefined) {
-      return c.json({ error: 'No baseline fields provided' }, 400);
-    }
-
-    const current = baselineService.getBaseline();
-    const updated = baselineService.setBaseline(
-      artists || current.artists,
-      genres || current.genres,
-      weight !== undefined ? weight : current.weight
-    );
-
-    return c.json({ success: true, baseline: updated });
-  });
-
-  app.post('/api/baseline/artist/add', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.artist) return c.json({ error: 'Missing artist name' }, 400);
-    const updated = baselineService.addArtist(String(body.artist));
-    return c.json({ success: true, baseline: updated });
-  });
-
-  app.post('/api/baseline/artist/remove', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.artist) return c.json({ error: 'Missing artist name' }, 400);
-    const updated = baselineService.removeArtist(String(body.artist));
-    return c.json({ success: true, baseline: updated });
-  });
-
-  app.post('/api/baseline/genre/add', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.genre) return c.json({ error: 'Missing genre' }, 400);
-    const updated = baselineService.addGenre(String(body.genre));
-    return c.json({ success: true, baseline: updated });
-  });
-
-  app.post('/api/baseline/genre/remove', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (!body.genre) return c.json({ error: 'Missing genre' }, 400);
-    const updated = baselineService.removeGenre(String(body.genre));
-    return c.json({ success: true, baseline: updated });
-  });
-  // --- Queue Admin Controls (Clear & Remove) ---
-  app.post('/api/queue/clear', requireAdminAuth, (c) => {
-    player.clearQueue();
-    return c.json({ success: true, message: 'Queue cleared' });
-  });
-
-  app.post('/api/queue/remove', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const index = typeof body.index === 'number' ? body.index : undefined;
-    const id = typeof body.id === 'string' ? body.id : undefined;
-    const target = index !== undefined ? index : id;
-    if (target === undefined) {
-      return c.json({ error: 'Missing "index" or "id" to remove' }, 400);
-    }
-    const removed = player.removeQueueTrack(target);
-    return c.json({ success: removed, target });
-  });
-
-  // --- Dedicated Volume Control Endpoint (Placed before :action wildcard) ---
-  app.post('/api/player/volume', async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    if (typeof body.volume === 'number') {
-      const isAdmin = checkIsAdmin(c);
-      if (!authService.isAuthEnabled() || isAdmin) {
-        player.setVolume(body.volume);
-      }
-    }
-    return c.json({ success: true, volume: player.getVolume() });
-  });
-
-  // --- 5. POST /api/player/:action ---
-  app.post('/api/player/:action', requireAdminAuth, async (c) => {
-    const action = c.req.param('action');
-    const body = await c.req.json().catch(() => ({}));
-
-    switch (action) {
-      case 'skip':
-        player.skip(body.userId || 'web_dashboard');
-        return c.json({ success: true, action: 'skip' });
-      case 'pause':
-        player.pause();
-        return c.json({ success: true, action: 'pause' });
-      case 'resume':
-        if (!player.currentTrack && player.getQueueList().length > 0) {
-          await player.playNext();
-          return c.json({ success: true, action: 'resume' });
-        }
-        player.resume();
-        return c.json({ success: true, action: 'resume' });
-      case 'stop':
-        player.stop();
-        return c.json({ success: true, action: 'stop' });
-      case 'clear':
-        player.clearQueue();
-        return c.json({ success: true, action: 'clear' });
-      case 'volume':
-        if (typeof body.volume === 'number') {
-          player.setVolume(body.volume);
-        }
-        return c.json({ success: true, volume: player.getVolume() });
-      case 'chime':
-        player.triggerChime();
-        return c.json({ success: true, action: 'chime' });
-      default:
-        return c.json({ error: `Unknown action: ${action}` }, 400);
+    while (alive) {
+      await new Promise((r) => setTimeout(r, 5000));
     }
   });
+});
 
+// --- Authentication Endpoints ---
+app.get('/api/auth/status', (c) => {
+  return c.json({
+    authEnabled: authService.isAuthEnabled(),
+    authMode: authService.getAuthMode(),
+    isAdmin: checkAdmin(c),
+  });
+});
 
-  // --- 5b. GET /api/brain (Brain & LLM Telemetry) ---
-  app.get('/api/brain', (c) => {
-    const stats = { totalQueries: 0, successCount: 0, timeoutCount: 0, avgDurationMs: 0, lastInteractionAt: null };
-    const recentInteractions: any[] = [];
-    const activeUserIds = player.getActiveListenerUserIds();
-    const roomProfile = curator.getActiveVoiceRoomProfile(activeUserIds);
-    const activeListeners = player.getActiveListenerNames();
+app.post('/api/auth/login', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const pw = String(body.password || '');
+  if (authService.verifyAdminPassword(pw)) {
+    const token = authService.createSessionToken('password');
+    return c.json({ ok: true, token });
+  }
+  return c.json({ error: 'Invalid admin password' }, 401);
+});
 
-    // All user preferences joined with users table
-    const preferences = sqlite.prepare(`
-      SELECT p.id, p.user_id, COALESCE(u.display_name, u.username, 'User ' || SUBSTR(p.user_id, -4)) as user_name,
-             p.target_type, p.target_key, p.display_name, p.likes, p.dislikes, p.early_skips, p.full_plays, p.affinity_score, p.updated_at
-      FROM user_preferences p
-      LEFT JOIN users u ON u.id = p.user_id
-      ORDER BY p.affinity_score DESC, p.updated_at DESC
-      LIMIT 100
-    `).all();
+// --- Studio Search, Charts & Discography ---
+app.get('/api/search', async (c) => {
+  const q = (c.req.query('q') || '').trim();
+  if (!q) return c.json({ results: [] });
+  const tracks = await searchStudioCatalog(q, 15, 'Web Dashboard');
+  return c.json({ results: tracks.map((t) => t.toJSON()) });
+});
 
-    const now = Math.floor(Date.now() / 1000);
-    const cutoff48h = now - (config.AUTOPLAY_COOLDOWN_HOURS * 3600);
-    const cutoff2h = now - (config.ARTIST_COOLDOWN_HOURS * 3600);
+app.get('/api/charts', async (c) => {
+  const country = (c.req.query('country') === 'us' ? 'us' : 'gb') as 'gb' | 'us';
+  const charts = await getOfficialCharts(country, 40);
+  return c.json({ country, tracks: charts });
+});
 
-    // Active 48h song cooldowns
-    const songCooldowns = sqlite.prepare(`
-      SELECT ph.id, s.title, ph.artist_name as artist, ph.played_at, ph.requested_by, ph.is_manual_request
-      FROM playback_history ph
-      JOIN songs s ON s.id = ph.song_id
-      WHERE ph.played_at > ?
-      ORDER BY ph.played_at DESC
-      LIMIT 30
-    `).all(cutoff48h);
+app.get('/api/discography', async (c) => {
+  const artist = (c.req.query('artist') || '').trim();
+  if (!artist) return c.json({ albums: [] });
+  const albums = await getArtistCategorizedDiscography(artist, 40);
+  return c.json({ artist, albums });
+});
 
-    // Active 2h artist cooldowns
-    const artistCooldowns = sqlite.prepare(`
-      SELECT artist_name, MAX(played_at) as last_played_at
-      FROM playback_history
-      WHERE played_at > ?
-      GROUP BY LOWER(artist_name)
-      ORDER BY last_played_at DESC
-      LIMIT 30
-    `).all(cutoff2h);
+// --- Play Now & Queue Endpoints ---
+app.post('/api/play', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const mode: 'now' | 'queue' = body.mode === 'queue' ? 'queue' : 'now';
 
-    // Active foreign language cooldowns
-    const languageCooldowns = curator.getActiveLanguageCooldowns();
-
-    return c.json({
-      vetoes: vetoService.getAllVetoes(),
-      model: 'MusicBrainz + Deezer + YouTube Music',
-      curationStatus: 'Active',
-      currentEngine: curator.getEngine(),
-      availableEngines: ['hybrid', 'graph', 'deezer'],
-      indexedVectorsCount: 0,
-      threadClamp: 3,
-      stats,
-      recentInteractions,
-      preferences,
-      roomProfile,
-      activeListeners,
-      songCooldowns,
-      artistCooldowns,
-      languageCooldowns,
-      cooldownConfig: {
-        songCooldownHours: config.AUTOPLAY_COOLDOWN_HOURS,
-        artistCooldownHours: config.ARTIST_COOLDOWN_HOURS,
-        languageCooldownMinutes: 0,
-      },
-      autoResume: {
-        enabled: config.AUTO_RESUME,
-        lastGuildId: getBotState('last_guild_id'),
-        lastVoiceChannelId: getBotState('last_voice_channel_id'),
-        lastVoiceChannelName: getBotState('last_voice_channel_name'),
-        wasPlaying: getBotState('was_playing') === '1',
-        lastTrackTitle: getBotState('last_track_title'),
-      },
-
+  if (body.track && body.track.title) {
+    const trk = new AudioTrack({
+      videoId: body.track.videoId || body.track.id?.replace(/^yt_/, ''),
+      deezerId: body.track.deezerId,
+      title: body.track.title,
+      artist: body.track.artist || 'Unknown Artist',
+      album: body.track.album || '',
+      duration: Number(body.track.duration) || 0,
+      artworkUrl: body.track.artworkUrl || body.track.cover || '',
+      isrc: body.track.isrc || '',
+      source: body.track.source || 'deezer',
+      isAutoplay: false,
+      requestedBy: 'Web Dashboard',
     });
-  });
-
-  // --- 5c. POST /api/brain/engine (Toggle Curation Architecture) ---
-  app.post('/api/brain/engine', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const engine = body.engine;
-    if (engine !== 'embedding' && engine !== 'graph' && engine !== 'deezer' && engine !== 'hybrid') {
-      return c.json({ error: 'Invalid engine. Must be "embedding", "jev", "llm", or "hybrid"' }, 400);
+    if (mode === 'now') {
+      await globalPlayer.playNow(trk);
+    } else {
+      globalPlayer.enqueue(trk);
     }
-    curator.setEngine(engine);
-    return c.json({ success: true, engine: curator.getEngine() });
+    return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+  }
+
+  const query = String(body.query || '').trim();
+  if (!query) return c.json({ error: 'Missing query or track' }, 400);
+
+  const { tracks, collectionName } = await resolveQueryToTracks(query, 'Web Dashboard');
+  if (tracks.length === 0) {
+    return c.json({ error: `No studio matches found for "${query}"` }, 404);
+  }
+
+  if (mode === 'now') {
+    const [first, ...rest] = tracks;
+    await globalPlayer.playNow(first);
+    if (rest.length > 0) globalPlayer.enqueueMany(rest);
+  } else {
+    globalPlayer.enqueueMany(tracks);
+  }
+
+  return c.json({
+    ok: true,
+    collectionName,
+    count: tracks.length,
+    state: globalPlayer.getStateSnapshot(),
   });
+});
 
-  // --- 5d. POST /api/brain/test-curation (On-Demand Dry Run with Active Engine) ---
-  app.post('/api/brain/test-curation', requireAdminAuth, async (c) => {
-    const activeUserIds = player.getActiveListenerUserIds();
-    const roomProfile = curator.getActiveVoiceRoomProfile(activeUserIds);
-    const SEED_ERAS = [
-      '1980s Post-Punk & Synth',
-      '1990s French Touch & Electro',
-      'Cyberpunk Darksynth',
-      '2000s Indie Dance',
-      '1970s Funk & Soul',
-      'Modern Melodic Techno',
-    ];
-    const randomSeedEra = SEED_ERAS[Math.floor(Math.random() * SEED_ERAS.length)];
-    const t0 = performance.now();
-    const activeEngine = curator.getEngine();
-    let recommendations: any[] = [];
+// --- Volume & Transport Controls (Volume registered before :action wildcard!) ---
+app.post('/api/player/volume', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const vol = Number(body.volume ?? 100);
+  const updated = globalPlayer.setVolume(vol);
+  return c.json({ ok: true, volume: updated });
+});
 
-    const currentTrack = player.currentTrack;
-    recommendations = await curator.getNextAutoplayTracks(
-      activeUserIds,
-      3,
-      [],
-      [],
-      [],
-      currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist } : null
-    );
+app.post('/api/player/:action', async (c) => {
+  const action = c.req.param('action');
+  if (['skip', 'stop', 'clear'].includes(action) && !checkAdmin(c)) {
+    return c.json({ error: 'Admin authentication required' }, 403);
+  }
 
-    const durationMs = Math.round(performance.now() - t0);
-    const latestInteraction = null;
+  switch (action) {
+    case 'pause':
+      globalPlayer.pause();
+      break;
+    case 'resume':
+      globalPlayer.resume();
+      break;
+    case 'toggle':
+      if (globalPlayer.isPaused) globalPlayer.resume();
+      else if (globalPlayer.isPlaying) globalPlayer.pause();
+      else void globalPlayer.playNext();
+      break;
+    case 'skip':
+      globalPlayer.skip();
+      break;
+    case 'stop':
+      globalPlayer.stop();
+      break;
+    case 'clear':
+      globalPlayer.queue = [];
+      globalPlayer.deck2Track = null;
+      globalPlayer.deck3Track = null;
+      globalPlayer.emitStateUpdate();
+      break;
+    case 'like':
+      globalPlayer.voteCurrentTrack('up');
+      break;
+    case 'dislike':
+      globalPlayer.voteCurrentTrack('down');
+      break;
+    default:
+      return c.json({ error: `Unknown action: ${action}` }, 400);
+  }
+  return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+});
 
-    let modelName = 'MusicBrainz + Deezer + YouTube Music';
+app.delete('/api/queue/:index', (c) => {
+  const idx = parseInt(c.req.param('index'), 10);
+  if (!Number.isNaN(idx) && idx >= 0 && idx < globalPlayer.queue.length) {
+    globalPlayer.queue.splice(idx, 1);
+    globalPlayer.emitStateUpdate();
+  }
+  return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+});
 
-    return c.json({
-      success: true,
-      durationMs,
-      engine: activeEngine,
-      model: modelName,
-      seedEra: randomSeedEra,
-      roomProfile,
-      recommendations,
-      latestInteraction,
-    });
-  });
+app.post('/api/vibe', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const mode = body.mode as VibeMode | undefined;
+  const engine = body.engine as VibeEngineSource | undefined;
+  if (typeof body.autoplay === 'boolean') {
+    globalPlayer.autoplay = body.autoplay;
+  }
+  globalPlayer.setVibeConfig(mode, engine);
+  return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+});
 
-  // --- 5e. POST /api/player/autoresume (Trigger Auto-Resume on Demand) ---
-  app.post('/api/player/autoresume', requireAdminAuth, async (c) => {
-    const discordClient = player.getDiscordClient();
-    if (!discordClient) {
-      return c.json({ error: 'Discord bot client not initialized' }, 500);
+export function startWebServer(): void {
+  serve(
+    {
+      fetch: app.fetch,
+      port: config.WEB_PORT,
+      hostname: config.WEB_HOST,
+    },
+    (info) => {
+      console.log(`🌐 [Web] OWRadio Studio Dashboard online at http://localhost:${info.port}`);
     }
-    const result = await executeAutoResume(discordClient, player);
-    return c.json({ success: result.resumed, result });
-  });
-
-  // --- 5e-2. GET /api/player/meter (Live PCM Acoustic Energy Meter) ---
-  app.get('/api/player/meter', (c) => {
-    return c.json(player.broadcastTee.getLiveAudioMeter());
-  });
-
-  // --- 5e2. POST /api/taste/onboard (Ingest Spotify / YouTube playlist URL) ---
-  app.post('/api/taste/onboard', async (c) => {
-    try {
-      const body = await c.req.json();
-      const url = body?.url;
-      if (!url || typeof url !== 'string') {
-        return c.json({ error: 'Missing playlist URL' }, 400);
-      }
-      const userId = 'web_dashboard';
-      const profile = await playlistParser.registerUserPlaylist(userId, url);
-      return c.json({ success: true, profile });
-    } catch (err) {
-      return c.json({ error: (err as Error).message }, 500);
-    }
-  });
-
-  // --- 6. GET /api/events (Server-Sent Events) ---
-  app.get('/api/events', (c) => {
-    return streamSSE(c, async (stream) => {
-      // Send initial state immediately
-      const host = c.req.header('host') || `127.0.0.1:${config.WEB_PORT}`;
-      const protocol = c.req.header('x-forwarded-proto') || 'http';
-      const baseUrl = `${protocol}://${host}`;
-
-      await stream.writeSSE({
-        event: 'state',
-        data: JSON.stringify(player.getStatePayload(baseUrl)),
-      });
-
-      const onStateChange = async (payload: any) => {
-        try {
-          await stream.writeSSE({
-            event: 'state',
-            data: JSON.stringify(payload),
-          });
-        } catch {
-          clearInterval(heartbeat);
-          player.off('stateChange', onStateChange);
-        }
-      };
-
-      player.on('stateChange', onStateChange);
-
-      let cleanedUp = false;
-      let resolveClosed: () => void;
-      const closedPromise = new Promise<void>((resolve) => {
-        resolveClosed = resolve;
-      });
-
-      const cleanup = () => {
-        if (cleanedUp) return;
-        cleanedUp = true;
-        clearInterval(heartbeat);
-        player.off('stateChange', onStateChange);
-        resolveClosed?.();
-      };
-
-      stream.onAbort(cleanup);
-      c.req.raw.signal.addEventListener('abort', cleanup);
-      const rawReq = c.req.raw as any;
-      if (rawReq?.socket) {
-        rawReq.socket.once?.('close', cleanup);
-        rawReq.socket.once?.('error', cleanup);
-      }
-      if (rawReq?.once) {
-        rawReq.once('close', cleanup);
-      }
-
-      // Keep connection alive with periodic comments
-      const heartbeat = setInterval(async () => {
-        try {
-          await stream.writeSSE({ event: 'ping', data: 'heartbeat' });
-        } catch {
-          cleanup();
-        }
-      }, 15_000);
-
-      // Keep stream alive: block until client closes connection or aborts
-      await closedPromise;
-    });
-  });
-
-  // --- 7. Serve Embedded Dashboard ---
-  const resolvePublicFile = (filename: string): string | null => {
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const candidates = [
-      path.join(process.cwd(), 'src', 'web', 'public', filename),
-      path.join(process.cwd(), 'dist', 'web', 'public', filename),
-      path.join(__dirname, 'public', filename),
-      path.join(process.cwd(), 'public', filename),
-    ];
-    for (const candidate of candidates) {
-      if (fs.existsSync(candidate)) return candidate;
-    }
-    return null;
-  };
-
-  const serveIndexHtml = (c: any) => {
-    const htmlPath = resolvePublicFile('index.html');
-    if (htmlPath) {
-      return c.html(fs.readFileSync(htmlPath, 'utf-8'));
-    }
-    return c.text('OWRadio Web Dashboard loading...');
-  };
-  app.get('/', serveIndexHtml);
-  app.get('/index.html', serveIndexHtml);
-
-  app.get('/app.js', (c) => {
-    const jsPath = resolvePublicFile('app.js');
-    if (jsPath) {
-      c.header('Content-Type', 'application/javascript');
-      return c.body(fs.readFileSync(jsPath, 'utf-8'));
-    }
-    return c.text('// app.js not found', 404);
-  });
-
-  return app;
+  );
 }
-
-export function startWebServer(player: GuildPlayer) {
-  const app = createWebServer(player);
-  const server = serve({
-    fetch: app.fetch,
-    port: config.WEB_PORT,
-    hostname: config.WEB_HOST,
-  });
-  console.log(`[WebServer] Hono server listening at http://${config.WEB_HOST}:${config.WEB_PORT}`);
-  return server;
-}
-
-export default {
-  createWebServer,
-  startWebServer,
-};
