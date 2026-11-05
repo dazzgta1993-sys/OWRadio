@@ -168,7 +168,7 @@ export async function getArtistCategorizedDiscography(artistName: string, limit 
   const cleanArtist = (artistName || '').trim();
   if (!cleanArtist) return [];
 
-  const cacheKey = `mb_disco:${cleanArtist.toLowerCase()}`;
+  const cacheKey = `mb_disco_v2:${cleanArtist.toLowerCase()}`;
   const cached = getApiCache<any[]>(cacheKey);
   if (cached) return cached.slice(0, limit);
 
@@ -182,7 +182,7 @@ export async function getArtistCategorizedDiscography(artistName: string, limit 
   const genres = await getArtistGenres(canonicalName);
   const primaryGenre = genres[0] || 'Music';
 
-  const rgUrl = `${MB_BASE}/release-group?artist=${mbid}&limit=100&inc=artist-credits&fmt=json`;
+  const rgUrl = `${MB_BASE}/release-group?artist=${mbid}&type=album|ep&limit=100&inc=artist-credits&fmt=json`;
   const rgData = await rateLimitedMbFetch(rgUrl);
   const rgs = rgData?.['release-groups'] || [];
 
@@ -225,7 +225,12 @@ export async function getArtistCategorizedDiscography(artistName: string, limit 
     });
   }
 
-  albums.sort((a, b) => String(b.releaseDate || '').localeCompare(String(a.releaseDate || '')));
+  albums.sort((a, b) => {
+    const aStudio = a.category === 'Studio Albums' ? 0 : 1;
+    const bStudio = b.category === 'Studio Albums' ? 0 : 1;
+    if (aStudio !== bStudio) return aStudio - bStudio;
+    return String(b.releaseDate || '').localeCompare(String(a.releaseDate || ''));
+  });
   if (albums.length > 0) {
     setApiCache(cacheKey, albums, 86400 * 14, 'musicbrainz');
   }
