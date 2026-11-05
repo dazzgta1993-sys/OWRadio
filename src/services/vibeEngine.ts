@@ -37,6 +37,7 @@ export interface VibeStateContext {
   vibeMode: VibeMode;
   vibeEngineSource: VibeEngineSource;
   vibeAnchorArtist: string;
+  vibeAnchorTrack?: AudioTrack | null;
   consecutiveAutoplayCount: number;
   currentTrack: AudioTrack | null;
   queue: AudioTrack[];
@@ -130,13 +131,8 @@ export async function fetchNextVibeTrack(
 
   const anchorPrimary = extractPrimaryArtist(ctx.vibeAnchorArtist || '');
   const seedPrimary = extractPrimaryArtist(effectiveSeed?.artist || anchorPrimary || '');
-  let targetArtist = seedPrimary || anchorPrimary;
-  if (ctx.vibeMode === 'deep_dive') targetArtist = anchorPrimary || seedPrimary;
-  else if (ctx.vibeMode === 'balanced' && anchorPrimary) {
-    if (ctx.consecutiveAutoplayCount >= 3 || (ctx.consecutiveAutoplayCount > 0 && Math.random() < 0.65)) {
-      targetArtist = anchorPrimary;
-    }
-  }
+  const targetArtist =
+    ctx.vibeMode === 'discovery' ? seedPrimary || anchorPrimary : anchorPrimary || seedPrimary;
 
   const src = ctx.vibeEngineSource || 'auto';
   const poolCap = ctx.vibeMode === 'discovery' ? 12 : 6;
@@ -161,7 +157,29 @@ export async function fetchNextVibeTrack(
     }
   }
 
-  // 2. DEEZER SMART ARTIST RADIO & RELATED CIRCLE (nb_fan >= 3000)
+  // 2. SONG-EXACT YOUTUBE MUSIC ALGORITHMIC RADIO (WEB_REMIX)
+  const anchorSong = ctx.vibeAnchorTrack || effectiveSeed;
+  if ((src === 'auto' && ctx.vibeMode !== 'collabs') || src === 'ytmusic') {
+    const seedVid = anchorSong?.videoId || effectiveSeed?.videoId || '';
+    const ytmQuery = `${targetArtist} ${anchorSong?.title || effectiveSeed?.title || ''}`.trim();
+    const ytmRadio = await getYtMusicRelatedTracks(seedVid, ytmQuery, 25);
+    const worthyYtm = ytmRadio.filter(
+      (t) =>
+        isCandidateFresh(t.channel, t.title) &&
+        isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)
+    );
+    if (worthyYtm.length > 0) {
+      const p = pickRandomTop(worthyYtm, poolCap);
+      return new AudioTrack({
+        videoId: p.id, title: p.title, artist: p.channel, album: p.album,
+        duration: p.durationSeconds, artworkUrl: p.thumbnail, source: 'autoplay',
+        isAutoplay: true, requestedBy: 'Vibe DJ (Song Radio)',
+        vibeReason: `Song Vibe: ${anchorSong?.title || targetArtist}`,
+      });
+    }
+  }
+
+  // 3. DEEZER SMART ARTIST RADIO & RELATED CIRCLE (nb_fan >= 3000)
   if (targetArtist && (src === 'auto' || src === 'deezer' || ctx.vibeMode === 'collabs')) {
     const dzArtist = await resolvePrimaryDeezerArtist(targetArtist);
     if (dzArtist) {
@@ -205,28 +223,6 @@ export async function fetchNextVibeTrack(
           });
         }
       }
-    }
-  }
-
-  // 3. YOUTUBE MUSIC ALGORITHMIC RADIO (WEB_REMIX)
-  if (src === 'auto' || src === 'ytmusic') {
-    const useAnchorQuery = anchorPrimary && targetArtist.toLowerCase() === anchorPrimary.toLowerCase();
-    const seedVid = useAnchorQuery ? '' : effectiveSeed?.videoId || '';
-    const ytmQuery = useAnchorQuery ? anchorPrimary : `${targetArtist} ${effectiveSeed?.title || ''}`.trim();
-    const ytmRadio = await getYtMusicRelatedTracks(seedVid, ytmQuery, 25);
-    const worthyYtm = ytmRadio.filter(
-      (t) =>
-        isCandidateFresh(t.channel, t.title) &&
-        isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)
-    );
-    if (worthyYtm.length > 0) {
-      const p = pickRandomTop(worthyYtm, poolCap);
-      return new AudioTrack({
-        videoId: p.id, title: p.title, artist: p.channel, album: p.album,
-        duration: p.durationSeconds, artworkUrl: p.thumbnail, source: 'autoplay',
-        isAutoplay: true, requestedBy: 'Vibe DJ (YouTube Music)',
-        vibeReason: `YouTube Music Radio: ${targetArtist || effectiveSeed?.title || 'Mix'}`,
-      });
     }
   }
 

@@ -45,6 +45,7 @@ export class GuildPlayer extends EventEmitter {
   public vibeMode: VibeMode = 'balanced';
   public vibeEngineSource: VibeEngineSource = 'auto';
   public vibeAnchorArtist = '';
+  public vibeAnchorTrack: AudioTrack | null = null;
   public consecutiveAutoplayCount = 0;
   public lastVibeDecision = 'Ready';
 
@@ -61,17 +62,10 @@ export class GuildPlayer extends EventEmitter {
     this.guildId = guildId;
     this.broadcastTee = new BroadcastTee();
     this.vibeMode = (getRuntimeSetting('vibe_mode', 'balanced') as VibeMode) || 'balanced';
-    this.vibeEngineSource =
-      (getRuntimeSetting('vibe_engine_source', 'auto') as VibeEngineSource) || 'auto';
-    this.audioPlayer = createAudioPlayer({
-      behaviors: { noSubscriber: NoSubscriberBehavior.Play },
-    });
-    this.audioPlayer.on(AudioPlayerStatus.Idle, () => {
-      if (!this.suppressIdleEvent) void this.playNext();
-    });
-    this.audioPlayer.on('error', () => {
-      if (!this.suppressIdleEvent) void this.playNext();
-    });
+    this.vibeEngineSource = (getRuntimeSetting('vibe_engine_source', 'auto') as VibeEngineSource) || 'auto';
+    this.audioPlayer = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play } });
+    this.audioPlayer.on(AudioPlayerStatus.Idle, () => { if (!this.suppressIdleEvent) void this.playNext(); });
+    this.audioPlayer.on('error', () => { if (!this.suppressIdleEvent) void this.playNext(); });
   }
 
   public attachVoiceConnection(conn: VoiceConnection): void {
@@ -180,8 +174,9 @@ export class GuildPlayer extends EventEmitter {
         if (nextTrack.vibeReason) this.lastVibeDecision = nextTrack.vibeReason;
       } else {
         this.vibeAnchorArtist = extractPrimaryArtist(nextTrack.artist);
+        this.vibeAnchorTrack = nextTrack;
         this.consecutiveAutoplayCount = 0;
-        this.lastVibeDecision = `Locked Anchor: ${this.vibeAnchorArtist}`;
+        this.lastVibeDecision = `Locked Anchor: ${this.vibeAnchorArtist} — ${nextTrack.title}`;
       }
       this.emitStateUpdate();
 
@@ -286,6 +281,7 @@ export class GuildPlayer extends EventEmitter {
       this.skip();
     } else {
       this.vibeAnchorArtist = extractPrimaryArtist(this.currentTrack.artist);
+      this.vibeAnchorTrack = this.currentTrack;
       this.emitStateUpdate();
     }
   }
@@ -293,7 +289,8 @@ export class GuildPlayer extends EventEmitter {
   public getVibeContext() {
     return {
       guildId: this.guildId, vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
-      vibeAnchorArtist: this.vibeAnchorArtist, consecutiveAutoplayCount: this.consecutiveAutoplayCount,
+      vibeAnchorArtist: this.vibeAnchorArtist, vibeAnchorTrack: this.vibeAnchorTrack,
+      consecutiveAutoplayCount: this.consecutiveAutoplayCount,
       currentTrack: this.currentTrack, queue: this.queue, history: this.history,
       deck2Track: this.deck2Track, deck3Track: this.deck3Track, failedKeys: this.failedKeys,
     };
