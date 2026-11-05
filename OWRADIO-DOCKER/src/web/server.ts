@@ -16,8 +16,9 @@ import {
   searchStudioCatalog,
   resolveQueryToTracks,
   searchArtistDiscography,
+  getAlbumTracklist,
 } from '../services/searchService.js';
-import { getOfficialCharts, searchItunesTracks } from '../services/itunes.js';
+import { getOfficialCharts } from '../services/itunes.js';
 import { getDeezerChartTracks } from '../services/deezer.js';
 import { VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
 import { removeTasteFeedback } from '../db/store.js';
@@ -139,8 +140,17 @@ app.get('/api/charts', async (c) => {
 app.get('/api/discography', async (c) => {
   const artist = (c.req.query('artist') || '').trim();
   if (!artist) return c.json({ albums: [] });
-  const data = await searchArtistDiscography(artist);
-  return c.json(data);
+  return c.json(await searchArtistDiscography(artist));
+});
+
+app.get('/api/album-tracks', async (c) => {
+  const artist = (c.req.query('artist') || '').trim();
+  const album = (c.req.query('album') || '').trim();
+  const mbid = (c.req.query('mbid') || '').trim();
+  const dzId = (c.req.query('deezerAlbumId') || '').trim();
+  if (!artist && !album && !mbid && !dzId) return c.json({ tracks: [] });
+  const tracks = await getAlbumTracklist(artist, album, mbid, dzId);
+  return c.json({ artist, album, tracks });
 });
 
 app.post('/api/play-album', async (c) => {
@@ -150,17 +160,13 @@ app.post('/api/play-album', async (c) => {
   const mode: 'now' | 'queue' = body.mode === 'queue' ? 'queue' : 'now';
   if (!artist || !album) return c.json({ error: 'Missing artist or album' }, 400);
 
-  const itTracks = await searchItunesTracks(`${artist} ${album}`, 20);
-  const matched = itTracks.filter(
-    (t) => t.album.toLowerCase().includes(album.toLowerCase()) || album.toLowerCase().includes(t.album.toLowerCase())
-  );
-  const pool = matched.length > 0 ? matched : itTracks.slice(0, 12);
-  const tracks = pool.map(
-    (t) =>
+  const raw = await getAlbumTracklist(artist, album, String(body.mbid || ''), String(body.deezerAlbumId || ''));
+  const tracks = raw.map(
+    (t: any) =>
       new AudioTrack({
-        title: t.title, artist: t.artist, album: t.album || album,
-        duration: t.duration, artworkUrl: t.cover, releaseYear: t.year,
-        source: 'apple', requestedBy: 'Album Explorer',
+        deezerId: t.deezerId, title: t.title, artist: t.artist || artist, album: t.album || album,
+        duration: t.duration || 0, artworkUrl: t.cover || '', isrc: t.isrc || '',
+        source: t.source || 'deezer', requestedBy: 'Album Explorer',
       })
   );
   if (tracks.length === 0) return c.json({ error: 'No tracks found for album' }, 404);

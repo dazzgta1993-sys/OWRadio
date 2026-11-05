@@ -236,3 +236,23 @@ export async function getArtistCategorizedDiscography(artistName: string, limit 
   }
   return albums.slice(0, limit);
 }
+
+export async function getMusicBrainzReleaseGroupTracks(mbid: string, artistName = ''): Promise<any[]> {
+  if (!mbid) return [];
+  const url = `${MB_BASE}/release?release-group=${encodeURIComponent(mbid)}&inc=recordings&fmt=json&limit=3`;
+  const data = await rateLimitedMbFetch(url);
+  const releases = data?.releases || [];
+  let bestMedia: any = null;
+  for (const r of releases) {
+    const m = r?.media?.[0];
+    if (m?.tracks?.length > (bestMedia?.tracks?.length || 0)) bestMedia = m;
+  }
+  if (!bestMedia?.tracks) return [];
+  return bestMedia.tracks.map((t: any, i: number) => ({
+    trackNumber: t.position || i + 1,
+    title: String(t.title || t.recording?.title || '').trim(),
+    artist: artistName || 'Unknown Artist',
+    duration: t.length ? Math.round(Number(t.length) / 1000) : 0,
+    source: 'musicbrainz',
+  })).filter((t: any) => t.title);
+}

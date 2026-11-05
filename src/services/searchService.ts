@@ -14,12 +14,13 @@ import { matchSpotifyUrl, resolveSpotifyUrl } from './spotify.js';
 import { searchYtMusicSongs } from './ytmusic.js';
 import {
   searchDeezerTracks,
+  searchDeezerAlbums,
   getDeezerAlbumDetails,
   resolvePrimaryDeezerArtist,
 } from './deezer.js';
 import { searchItunesTracks } from './itunes.js';
 import { searchYouTubeBasic } from './youtube.js';
-import { getArtistCategorizedDiscography } from './musicbrainz.js';
+import { getArtistCategorizedDiscography, getMusicBrainzReleaseGroupTracks } from './musicbrainz.js';
 import { isUnwantedVariant, isSkitOrIntro } from './streamFilters.js';
 import { normalizeTrackKey } from '../utils/artistNormalizer.js';
 
@@ -200,11 +201,71 @@ export async function searchStudioCatalog(
 export async function searchArtistDiscography(artistQuery: string) {
   const dzArtist = await resolvePrimaryDeezerArtist(artistQuery);
   const canonicalName = dzArtist?.name || artistQuery.trim();
-  const mbAlbums = await getArtistCategorizedDiscography(canonicalName, 40);
+  const [mbAlbums, dzAlbums] = await Promise.all([
+    getArtistCategorizedDiscography(canonicalName, 40),
+    searchDeezerAlbums(canonicalName, 25),
+  ]);
+
+  for (const alb of mbAlbums) {
+    const dzMatch = dzAlbums.find(
+      (d) =>
+        d.title.toLowerCase() === alb.title.toLowerCase() ||
+        d.title.toLowerCase().includes(alb.title.toLowerCase()) ||
+        alb.title.toLowerCase().includes(d.title.toLowerCase())
+    );
+    if (dzMatch) {
+      alb.deezerAlbumId = dzMatch.id;
+      if (dzMatch.cover) alb.cover = dzMatch.cover;
+    }
+  }
   return {
     artist: canonicalName,
     picture: dzArtist?.picture || '',
     fans: dzArtist?.fans || 0,
     albums: mbAlbums,
   };
+}
+
+export async function getAlbumTracklist(artist: string, album: string, mbid = '', deezerAlbumId = '') {
+  let dzId = deezerAlbumId;
+  if (!dzId && artist && album) {
+    const dzAlbs = await searchDeezerAlbums(`${artist} ${album}`, 5);
+    const match = dzAlbs.find(
+      (a) => a.title.toLowerCase().includes(album.toLowerCase()) || album.toLowerCase().includes(a.title.toLowerCase())
+    );
+    if (match) dzId = match.id;
+  }
+  if (dzId) {
+    const details = await getDeezerAlbumDetails(dzId);
+    if (details?.tracks?.length) {
+      return details.tracks.map((t: any, i: number) => ({
+        trackNumber: i + 1,
+        deezerId: t.id,
+        title: t.title,
+        artist: t.artist || artist,
+        album: details.title || album,
+        duration: t.duration || 0,
+        cover: t.cover || details.cover || '',
+        isrc: t.isrc || '',
+        source: 'deezer',
+      }));
+    }
+  }
+  if (mbid) {
+    const mbTracks = await getMusicBrainzReleaseGroupTracks(mbid, artist);
+    if (mbTracks.length > 0) return mbTracks.map((t) => ({ ...t, album }));
+  }
+  const itTracks = await searchItunesTracks(`${artist} ${album}`, 20);
+  const filtered = itTracks.filter(
+    (t) => t.album.toLowerCase().includes(album.toLowerCase()) || album.toLowerCase().includes(t.album.toLowerCase())
+  );
+  return (filtered.length ? filtered : itTracks.slice(0, 12)).map((t, i) => ({
+    trackNumber: i + 1,
+    title: t.title,
+    artist: t.artist || artist,
+    album: t.album || album,
+    duration: t.duration || 0,
+    cover: t.cover || '',
+    source: 'apple',
+  }));
 }

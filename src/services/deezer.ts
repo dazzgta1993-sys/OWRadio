@@ -245,3 +245,16 @@ export async function getDeezerChartTracks(limit = 30): Promise<DeezerTrack[]> {
   }
   return tracks.slice(0, limit);
 }
+
+export async function searchDeezerAlbums(query: string, limit = 15): Promise<{ id: string; title: string; artist: string; cover: string }[]> {
+  const q = (query || '').trim();
+  if (!q) return [];
+  const data = await fetchDeezerJson(`${DEEZER_BASE}/search/album?q=${encodeURIComponent(q)}&limit=${limit}`, 3600);
+  if (!data?.data) return [];
+  return data.data.map((a: any) => ({
+    id: String(a.id || ''),
+    title: String(a.title || '').trim(),
+    artist: String(a?.artist?.name || ''),
+    cover: a.cover_xl || a.cover_big || a.cover_medium || '',
+  })).filter((a: any) => a.id && a.title);
+}
