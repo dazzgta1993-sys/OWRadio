@@ -21,6 +21,7 @@ import { extractPrimaryArtist, normalizeTrackKey } from '../utils/artistNormaliz
 import {
   savePlaybackHistory,
   recordTasteFeedback,
+  removeTasteFeedback,
   getTasteProfile,
   getRuntimeSetting,
   setRuntimeSetting,
@@ -178,6 +179,7 @@ export class GuildPlayer extends EventEmitter {
         this.vibeAnchorTrack = nextTrack;
         this.consecutiveAutoplayCount = 0;
         this.lastVibeDecision = 'Direct Studio Selection';
+        removeTasteFeedback(this.vibeAnchorArtist, this.guildId);
       }
       this.emitStateUpdate();
 
@@ -307,6 +309,7 @@ export class GuildPlayer extends EventEmitter {
         likedArtists: [...tp.likedArtists],
         dislikedArtists: [...tp.dislikedArtists],
         dislikedTracks: [...tp.dislikedTracks],
+        cooldowns: tp.cooldowns,
       },
     };
   }

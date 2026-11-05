@@ -16,10 +16,17 @@ export interface StreamResolutionRecord {
   matchType?: string;
 }
 
+export interface CooldownEntry {
+  key: string;
+  type: 'artist' | 'track';
+  remainingMins: number;
+}
+
 export interface TasteProfile {
   likedArtists: Set<string>;
   dislikedArtists: Set<string>;
   dislikedTracks: Set<string>;
+  cooldowns: CooldownEntry[];
 }
 
 const memApiCache = new Map<string, { data: any; expiresAt: number }>();
@@ -189,20 +196,37 @@ export function getTasteProfile(guildId = 'global'): TasteProfile {
   const likedArtists = new Set<string>();
   const dislikedArtists = new Set<string>();
   const dislikedTracks = new Set<string>();
+  const cooldowns: CooldownEntry[] = [];
+  const now = Math.floor(Date.now() / 1000);
   try {
     const rows = sqlite
-      .prepare('SELECT entity_type, entity_key, vote FROM taste_feedback WHERE guild_id = ?')
+      .prepare('SELECT entity_type, entity_key, vote, updated_at FROM taste_feedback WHERE guild_id = ?')
       .all(guildId);
     for (const r of rows) {
+      const key = String(r.entity_key);
+      const age = now - Number(r.updated_at || now);
       if (r.entity_type === 'artist') {
-        if (r.vote === 'up') likedArtists.add(String(r.entity_key));
-        if (r.vote === 'down') dislikedArtists.add(String(r.entity_key));
+        if (r.vote === 'up') {
+          likedArtists.add(key);
+        } else if (r.vote === 'down') {
+          if (age < 7200) {
+            dislikedArtists.add(key);
+            cooldowns.push({ key, type: 'artist', remainingMins: Math.max(1, Math.ceil((7200 - age) / 60)) });
+          } else {
+            sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'artist' AND entity_key = ?").run(guildId, key);
+          }
+        }
       } else if (r.entity_type === 'track' && r.vote === 'down') {
-        dislikedTracks.add(String(r.entity_key));
+        if (age < 86400) {
+          dislikedTracks.add(key);
+          cooldowns.push({ key, type: 'track', remainingMins: Math.max(1, Math.ceil((86400 - age) / 60)) });
+        } else {
+          sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'track' AND entity_key = ?").run(guildId, key);
+        }
       }
     }
   } catch {}
-  return { likedArtists, dislikedArtists, dislikedTracks };
+  return { likedArtists, dislikedArtists, dislikedTracks, cooldowns };
 }
 
 export function removeTasteFeedback(entityKey: string, guildId = 'global'): void {

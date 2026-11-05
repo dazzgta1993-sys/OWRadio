@@ -240,10 +240,11 @@ function renderState(s) {
       : '<span style="font-size:12px;color:#9ca3af;">No locked vibes yet — click 👍 Lock Vibe on any track.</span>';
   }
   if (dislikedEl && s.taste) {
-    const blocked = [...(s.taste.dislikedArtists || []), ...(s.taste.dislikedTracks || [])];
-    dislikedEl.innerHTML = blocked.length
-      ? blocked.map((k) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">🚫 ${window.escapeHtml(k)} <button class="taste-rm" data-key="${window.escapeHtml(k)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
-      : '<span style="font-size:12px;color:#9ca3af;">No blocked artists or songs.</span>';
+    const cds = s.taste.cooldowns || [];
+    const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+    dislikedEl.innerHTML = cds.length
+      ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
+      : '<span style="font-size:12px;color:#9ca3af;">No active artist or song cooldowns.</span>';
   }
   document.querySelectorAll('.taste-rm').forEach((b) =>
     b.addEventListener('click', async () => {
