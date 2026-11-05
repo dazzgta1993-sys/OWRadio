@@ -1,7 +1,7 @@
 /**
  * @file bot/autoResume.ts
- * @description Restores recent playback history, connects to the default Discord Voice Channel,
- * and automatically starts 24/7 Autoplay broadcasting on startup.
+ * @description Restores recent playback history, locks the Anchor to the last manually
+ * requested song (never an Autoplay drift track), connects to Discord Voice, and starts 24/7 radio.
  */
 
 import { Client, VoiceBasedChannel } from 'discord.js';
@@ -15,28 +15,34 @@ import { extractPrimaryArtist } from '../utils/artistNormalizer.js';
 export async function runAutoResume(client: Client): Promise<void> {
   if (!config.AUTO_RESUME) return;
 
-  // 1. Restore recent playback history & Vibe Anchor from SQLite
+  // 1. Restore recent playback history & lock Vibe Anchor to the last MANUAL track
   try {
-    const rows = getRecentHistory(15, 'global');
+    const rows = getRecentHistory(25, 'global');
     if (rows.length > 0 && globalPlayer.history.length === 0) {
+      let lastManualTrack: AudioTrack | null = null;
       for (const r of [...rows].reverse()) {
-        globalPlayer.history.push(
-          new AudioTrack({
-            id: String(r.track_id || ''),
-            videoId: String(r.video_id || ''),
-            title: String(r.title || ''),
-            artist: String(r.artist || ''),
-            album: String(r.album || ''),
-            duration: Number(r.duration_sec || 0),
-            artworkUrl: String(r.artwork_url || ''),
-            source: (r.source as any) || 'ytmusic',
-            isAutoplay: Boolean(r.is_autoplay),
-            requestedBy: String(r.requested_by || 'AutoResume'),
-          })
-        );
+        const trk = new AudioTrack({
+          id: String(r.track_id || ''),
+          videoId: String(r.video_id || ''),
+          title: String(r.title || ''),
+          artist: String(r.artist || ''),
+          album: String(r.album || ''),
+          duration: Number(r.duration_sec || 0),
+          artworkUrl: String(r.artwork_url || ''),
+          source: (r.source as any) || 'ytmusic',
+          isAutoplay: Boolean(r.is_autoplay),
+          requestedBy: String(r.requested_by || 'AutoResume'),
+        });
+        globalPlayer.history.push(trk);
+        if (!trk.isAutoplay) {
+          lastManualTrack = trk;
+        }
       }
-      if (!globalPlayer.vibeAnchorArtist && rows[0]?.artist) {
-        globalPlayer.vibeAnchorArtist = extractPrimaryArtist(String(rows[0].artist));
+      const anchorSource = lastManualTrack || globalPlayer.history[globalPlayer.history.length - 1];
+      if (anchorSource && !globalPlayer.vibeAnchorArtist) {
+        globalPlayer.vibeAnchorArtist = extractPrimaryArtist(anchorSource.artist);
+        globalPlayer.vibeAnchorTrack = anchorSource;
+        console.log(`⚓ [AutoResume] Restored Vibe Anchor: ${globalPlayer.vibeAnchorArtist} — ${anchorSource.title}`);
       }
     }
   } catch {}

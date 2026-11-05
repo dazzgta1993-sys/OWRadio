@@ -1,9 +1,8 @@
 /**
  * @file services/vibeEngine.ts
- * @description Port of Album Discovery Bot's Multi-Platform Vibe Engine (vibe_engine.py).
- * 100% real curation across YouTube Music Song Radio (cross-verified on Deezer Studio),
- * Deezer Artist Radio, Deezer Related Artists (nb_fan >= 3000), Apple Music/iTunes,
- * MusicBrainz Studio Discography, and UK/US Official Charts.
+ * @description True Multi-Cloud Vibe Engine rotating across YouTube Music (WEB_REMIX),
+ * Deezer Studio Radio & Related Circle (3,000+ Fans), MusicBrainz Canonical Studio Albums,
+ * Apple Music / iTunes, and Official UK/US Charts.
  */
 
 import AudioTrack from '../player/AudioTrack.js';
@@ -20,6 +19,7 @@ import {
   getDeezerArtistRadio,
   getDeezerRelatedArtists,
   getDeezerArtistTopTracks,
+  getDeezerChartTracks,
   searchDeezerTracks,
 } from './deezer.js';
 import { getYtMusicRelatedTracks } from './ytmusic.js';
@@ -44,6 +44,8 @@ export interface VibeStateContext {
   failedKeys: Set<string>;
 }
 
+let autoEngineRotationIdx = 0;
+
 export function isVibeWorthy(
   cand: { title: string; artist: string; album?: string; duration?: number; rank?: number },
   artistFans = 0,
@@ -60,8 +62,9 @@ export function isVibeWorthy(
   if (isJunkAlbumTitle(title, artist) || isSkitOrIntro(title, cand.duration || 0)) return false;
   if (isUnwantedVariant(title, '', artist)) return false;
 
+  // Reject short TikTok edits/covers (<110s) and marathon DJ mixes (>540s)
   const dur = cand.duration || 0;
-  if (dur > 0 && (dur < 65 || dur > 540)) return false;
+  if (dur > 0 && (dur < 110 || dur > 540)) return false;
   if (artistFans > 0 && artistFans < 3000) return false;
 
   if (artist.toLowerCase() !== 'live') {
@@ -133,9 +136,10 @@ export async function fetchNextVibeTrack(
   const targetArtist =
     ctx.vibeMode === 'discovery' ? seedPrimary || anchorPrimary : anchorPrimary || seedPrimary;
   const src = ctx.vibeEngineSource || 'auto';
-  const poolCap = ctx.vibeMode === 'discovery' ? 12 : 6;
+  const poolCap = ctx.vibeMode === 'discovery' ? 10 : 6;
+  const anchorSong = ctx.vibeAnchorTrack || effectiveSeed;
 
-  // 1. DEEP DIVE MODE
+  // 1. DEEP DIVE MODE (100% Same Artist Studio Catalog)
   if (ctx.vibeMode === 'deep_dive' && targetArtist) {
     const dzArtist = await resolvePrimaryDeezerArtist(targetArtist);
     if (dzArtist) {
@@ -148,120 +152,154 @@ export async function fetchNextVibeTrack(
         return new AudioTrack({
           deezerId: p.id, title: p.title, artist: dzArtist.name, artistId: dzArtist.id,
           album: p.album, duration: p.duration, artworkUrl: p.cover || dzArtist.picture,
-          isrc: p.isrc, source: 'autoplay', isAutoplay: true,
+          isrc: p.isrc, source: 'deezer', isAutoplay: true,
           requestedBy: 'Vibe DJ (Deep Dive)', vibeReason: `Deep Dive: ${dzArtist.name}`,
         });
       }
     }
   }
 
-  // 2. SONG-EXACT YOUTUBE MUSIC ALGORITHMIC RADIO (WEB_REMIX + DEEZER STUDIO VERIFICATION)
-  const anchorSong = ctx.vibeAnchorTrack || effectiveSeed;
-  if ((src === 'auto' && ctx.vibeMode !== 'collabs') || src === 'ytmusic') {
+  // Define the 4 Studio Curation Engines so 'auto' rotates across all services fairly
+  const tryYtMusicSongRadio = async (): Promise<AudioTrack | null> => {
+    if (!targetArtist) return null;
     const primaryVid = anchorSong?.videoId || effectiveSeed?.videoId || '';
     const primaryQuery = `${targetArtist} ${anchorSong?.title || effectiveSeed?.title || ''}`.trim();
-    let ytmRadio = await getYtMusicRelatedTracks(primaryVid, primaryQuery, 25);
+    const ytmRadio = await getYtMusicRelatedTracks(primaryVid, primaryQuery, 25);
     let worthyYtm = ytmRadio.filter(
       (t) =>
         isCandidateFresh(t.channel, t.title) &&
         isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)
     );
-    // If primary anchor page has fewer than 3 fresh songs left, expand with current track's radio
-    if (worthyYtm.length < 3 && effectiveSeed && effectiveSeed.videoId && effectiveSeed.videoId !== primaryVid) {
-      const secondaryRadio = await getYtMusicRelatedTracks(effectiveSeed.videoId, `${effectiveSeed.artist} ${effectiveSeed.title}`, 20);
-      worthyYtm.push(
-        ...secondaryRadio.filter(
-          (t) =>
-            isCandidateFresh(t.channel, t.title) &&
-            isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)
-        )
-      );
+    if (worthyYtm.length < 3 && effectiveSeed?.videoId && effectiveSeed.videoId !== primaryVid) {
+      const sec = await getYtMusicRelatedTracks(effectiveSeed.videoId, `${effectiveSeed.artist} ${effectiveSeed.title}`, 20);
+      worthyYtm.push(...sec.filter((t) => isCandidateFresh(t.channel, t.title) && isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)));
     }
-
     const topPool = worthyYtm.slice(0, poolCap).sort(() => Math.random() - 0.5);
     for (const p of topPool) {
       const dzVerify = await searchDeezerTracks(`${extractPrimaryArtist(p.channel)} ${p.title}`, 4);
       const dzMatch = dzVerify.find(
         (d) =>
-          (d.rank || 0) >= 80000 &&
+          (d.rank || 0) >= 120000 &&
+          d.duration >= 110 &&
           !isUnwantedVariant(d.title, p.title, d.artist) &&
           isCandidateFresh(d.artist, d.title)
       );
-      if (dzMatch || src === 'ytmusic') {
+      if (dzMatch) {
+        const dzArt = await resolvePrimaryDeezerArtist(dzMatch.artist);
+        if (dzArt && dzArt.fans < 3000) continue;
         return new AudioTrack({
-          videoId: p.id, deezerId: dzMatch?.id, title: dzMatch?.title || p.title,
-          artist: dzMatch?.artist || p.channel, album: dzMatch?.album || p.album,
-          duration: dzMatch?.duration || p.durationSeconds, artworkUrl: dzMatch?.cover || p.thumbnail,
-          isrc: dzMatch?.isrc, source: 'autoplay', isAutoplay: true,
-          requestedBy: 'Vibe DJ (Song Radio)', vibeReason: `Song Vibe: ${anchorSong?.title || targetArtist}`,
+          videoId: p.id, deezerId: dzMatch.id, title: dzMatch.title, artist: dzMatch.artist,
+          album: dzMatch.album || p.album, duration: dzMatch.duration, artworkUrl: dzMatch.cover || p.thumbnail,
+          isrc: dzMatch.isrc, source: 'ytmusic', isAutoplay: true,
+          requestedBy: 'Vibe DJ (YouTube Music)', vibeReason: `YTMusic Song Radio: ${anchorSong?.title || targetArtist}`,
         });
       }
     }
-  }
+    return null;
+  };
 
-  // 3. DEEZER SMART ARTIST RADIO & RELATED CIRCLE (nb_fan >= 3000)
-  if (targetArtist && (src === 'auto' || src === 'deezer' || ctx.vibeMode === 'collabs')) {
+  const tryDeezerArtistRadio = async (): Promise<AudioTrack | null> => {
+    if (!targetArtist) return null;
     const dzArtist = await resolvePrimaryDeezerArtist(targetArtist);
-    if (dzArtist) {
-      if (ctx.vibeMode !== 'collabs') {
-        const radio = await getDeezerArtistRadio(dzArtist.id, 35);
-        const worthyRadio = radio.filter(
-          (t) => isCandidateFresh(t.artist, t.title) && isVibeWorthy(t, 5000, dislikedArtists, dislikedTracks)
-        );
-        if (worthyRadio.length > 0) {
-          worthyRadio.sort((a, b) => (b.rank || 0) - (a.rank || 0));
-          const p = pickRandomTop(worthyRadio, poolCap);
-          return new AudioTrack({
-            deezerId: p.id, title: p.title, artist: p.artist, artistId: p.artistId,
-            album: p.album, duration: p.duration, artworkUrl: p.cover, isrc: p.isrc,
-            source: 'autoplay', isAutoplay: true,
-            requestedBy: 'Vibe DJ (Deezer Radio)', vibeReason: `Deezer Artist Radio: ${dzArtist.name}`,
-          });
-        }
-      }
-
-      const related = await getDeezerRelatedArtists(dzArtist.id, 15);
-      const worthyRel = related.filter(
-        (r) =>
-          r.fans >= 3000 &&
-          !splitCollabArtists(r.name).some((c) => recentArtists.has(c.toLowerCase())) &&
-          !dislikedArtists.has(r.name.toLowerCase())
+    if (!dzArtist) return null;
+    if (ctx.vibeMode !== 'collabs') {
+      const radio = await getDeezerArtistRadio(dzArtist.id, 35);
+      const worthyRadio = radio.filter(
+        (t) => (t.rank || 0) >= 100000 && isCandidateFresh(t.artist, t.title) && isVibeWorthy(t, 5000, dislikedArtists, dislikedTracks)
       );
-      if (worthyRel.length > 0) {
-        const relPick = pickRandomTop(worthyRel, 5);
-        const relTop = await getDeezerArtistTopTracks(relPick.id, 8);
-        const worthyTop = relTop.filter(
-          (t) => isCandidateFresh(relPick.name, t.title) && isVibeWorthy(t, relPick.fans, dislikedArtists, dislikedTracks)
-        );
-        if (worthyTop.length > 0) {
-          const p = pickRandomTop(worthyTop, 3);
+      if (worthyRadio.length > 0) {
+        worthyRadio.sort((a, b) => (b.rank || 0) - (a.rank || 0));
+        const p = pickRandomTop(worthyRadio, poolCap);
+        return new AudioTrack({
+          deezerId: p.id, title: p.title, artist: p.artist, artistId: p.artistId,
+          album: p.album, duration: p.duration, artworkUrl: p.cover, isrc: p.isrc,
+          source: 'deezer', isAutoplay: true,
+          requestedBy: 'Vibe DJ (Deezer Radio)', vibeReason: `Deezer Artist Radio: ${dzArtist.name}`,
+        });
+      }
+    }
+    const related = await getDeezerRelatedArtists(dzArtist.id, 15);
+    const worthyRel = related.filter(
+      (r) => r.fans >= 3000 && !splitCollabArtists(r.name).some((c) => recentArtists.has(c.toLowerCase())) && !dislikedArtists.has(r.name.toLowerCase())
+    );
+    if (worthyRel.length > 0) {
+      const relPick = pickRandomTop(worthyRel, 5);
+      const relTop = await getDeezerArtistTopTracks(relPick.id, 8);
+      const worthyTop = relTop.filter((t) => isCandidateFresh(relPick.name, t.title) && isVibeWorthy(t, relPick.fans, dislikedArtists, dislikedTracks));
+      if (worthyTop.length > 0) {
+        const p = pickRandomTop(worthyTop, 3);
+        return new AudioTrack({
+          deezerId: p.id, title: p.title, artist: relPick.name, artistId: relPick.id,
+          album: p.album, duration: p.duration, artworkUrl: p.cover || relPick.picture,
+          isrc: p.isrc, source: 'deezer', isAutoplay: true,
+          requestedBy: 'Vibe DJ (Deezer Related)', vibeReason: `Deezer Related (3k+ Fans): ${relPick.name}`,
+        });
+      }
+    }
+    return null;
+  };
+
+  const tryMusicBrainzAndApple = async (): Promise<AudioTrack | null> => {
+    if (!targetArtist) return null;
+    const dzArtist = await resolvePrimaryDeezerArtist(targetArtist);
+    const related = dzArtist ? await getDeezerRelatedArtists(dzArtist.id, 10) : [];
+    const validRel = related.filter((r) => r.fans >= 5000 && !splitCollabArtists(r.name).some((c) => recentArtists.has(c.toLowerCase())));
+    const lookupArtist = validRel.length > 0 ? pickRandomTop(validRel, 4).name : targetArtist;
+
+    if (src === 'musicbrainz' || (src === 'auto' && autoEngineRotationIdx % 2 === 0)) {
+      const mbAlbums = await getArtistCategorizedDiscography(lookupArtist, 15);
+      const studios = mbAlbums.filter((a) => a.category === 'Studio Albums');
+      if (studios.length > 0) {
+        const albPick = pickRandomTop(studios, 4);
+        const itTracks = await searchItunesTracks(`${lookupArtist} ${albPick.title}`, 8);
+        const worthyMb = itTracks.filter((t) => isCandidateFresh(t.artist, t.title) && isVibeWorthy(t, 5000, dislikedArtists, dislikedTracks));
+        if (worthyMb.length > 0) {
+          const p = pickRandomTop(worthyMb, 3);
           return new AudioTrack({
-            deezerId: p.id, title: p.title, artist: relPick.name, artistId: relPick.id,
-            album: p.album, duration: p.duration, artworkUrl: p.cover || relPick.picture,
-            isrc: p.isrc, source: 'autoplay', isAutoplay: true,
-            requestedBy: 'Vibe DJ (Related Artist)', vibeReason: `Related to ${dzArtist.name}: ${relPick.name}`,
+            title: p.title, artist: p.artist, album: p.album || albPick.title, duration: p.duration,
+            artworkUrl: p.cover || albPick.cover, releaseYear: p.year || albPick.year,
+            source: 'musicbrainz', isAutoplay: true, requestedBy: 'Vibe DJ (MusicBrainz)', vibeReason: `MusicBrainz Studio LP: ${albPick.title}`,
           });
         }
       }
     }
+    const appleTracks = await searchItunesTracks(lookupArtist, 15);
+    const worthyApple = appleTracks.filter((t) => isCandidateFresh(t.artist, t.title) && isVibeWorthy(t, 5000, dislikedArtists, dislikedTracks));
+    if (worthyApple.length > 0) {
+      const p = pickRandomTop(worthyApple, 5);
+      return new AudioTrack({
+        title: p.title, artist: p.artist, album: p.album, duration: p.duration,
+        artworkUrl: p.cover, releaseYear: p.year, genre: p.genre, source: 'apple',
+        isAutoplay: true, requestedBy: 'Vibe DJ (Apple Music)', vibeReason: `Apple Music Studio: ${lookupArtist}`,
+      });
+    }
+    return null;
+  };
+
+  // Execute according to selected source OR rotate across all engines in 'auto' mode
+  if (src === 'ytmusic') { const r = await tryYtMusicSongRadio(); if (r) return r; }
+  else if (src === 'deezer' || ctx.vibeMode === 'collabs') { const r = await tryDeezerArtistRadio(); if (r) return r; }
+  else if (src === 'musicbrainz' || src === 'apple') { const r = await tryMusicBrainzAndApple(); if (r) return r; }
+  else if (src === 'auto' && targetArtist) {
+    const engines = [tryYtMusicSongRadio, tryDeezerArtistRadio, tryMusicBrainzAndApple];
+    const startIdx = autoEngineRotationIdx++ % engines.length;
+    for (let i = 0; i < engines.length; i++) {
+      const track = await engines[(startIdx + i) % engines.length]();
+      if (track) return track;
+    }
   }
 
-  // 4. MUSICBRAINZ CANONICAL STUDIO DISCOGRAPHY & APPLE / CHARTS FALLBACK
-  if (src === 'musicbrainz' && targetArtist) {
-    const mbAlbums = await getArtistCategorizedDiscography(targetArtist, 20);
-    const pool = mbAlbums.filter((a) => a.category === 'Studio Albums');
-    if ((pool.length ? pool : mbAlbums).length > 0) {
-      const albPick = pickRandomTop(pool.length ? pool : mbAlbums, 6);
-      const itTracks = await searchItunesTracks(`${targetArtist} ${albPick.title}`, 10);
-      const worthyMb = itTracks.filter((t) => isCandidateFresh(t.artist, t.title) && isVibeWorthy(t, 5000, dislikedArtists, dislikedTracks));
-      if (worthyMb.length > 0) {
-        const p = pickRandomTop(worthyMb, 4);
-        return new AudioTrack({
-          title: p.title, artist: p.artist, album: p.album || albPick.title, duration: p.duration,
-          artworkUrl: p.cover || albPick.cover, releaseYear: p.year || albPick.year,
-          source: 'autoplay', isAutoplay: true, requestedBy: 'Vibe DJ (MusicBrainz)', vibeReason: `Studio LP: ${albPick.title}`,
-        });
-      }
+  // Cold-start / Charts rotation across Apple UK/US Official Charts & Deezer Global Top
+  if (src === 'deezer' || (src === 'auto' && autoEngineRotationIdx % 2 === 1)) {
+    const dzCharts = await getDeezerChartTracks(35);
+    const worthyDz = dzCharts.filter((c) => isCandidateFresh(c.artist, c.title) && isVibeWorthy(c, 10000, dislikedArtists, dislikedTracks));
+    if (worthyDz.length > 0) {
+      const p = pickRandomTop(worthyDz, 10);
+      return new AudioTrack({
+        deezerId: p.id, title: p.title, artist: p.artist, album: p.album, duration: p.duration,
+        artworkUrl: p.cover, source: 'deezer', isAutoplay: true,
+        requestedBy: 'Vibe DJ (Deezer Top)', vibeReason: 'Deezer Global Top Rotation',
+      });
     }
   }
 
@@ -271,8 +309,8 @@ export async function fetchNextVibeTrack(
     const p = pickRandomTop(worthyCharts, 10);
     return new AudioTrack({
       title: p.title, artist: p.artist, album: p.album, duration: p.duration,
-      artworkUrl: p.cover, releaseYear: p.year, source: 'autoplay', isAutoplay: true,
-      requestedBy: 'Vibe DJ (Official Charts)', vibeReason: 'Official Top 40 Rotation',
+      artworkUrl: p.cover, releaseYear: p.year, source: 'apple', isAutoplay: true,
+      requestedBy: 'Vibe DJ (Official Charts)', vibeReason: 'Apple / UK Official Top 40',
     });
   }
   return null;

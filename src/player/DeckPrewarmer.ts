@@ -78,7 +78,10 @@ export async function prewarmPlayerDecks(player: {
     }
     t2 = player.deck2Track;
   }
-  if (t2) await ensureTrackStreamReady(t2, () => player.emitStateUpdate());
+  if (t2) {
+    await ensureTrackStreamReady(t2, () => player.emitStateUpdate());
+    console.log(`⚡ [Deck 2 Ready] ${t2.artist} — ${t2.title} [${t2.formattedDuration}] (${t2.source.toUpperCase()})`);
+  }
 
   let t3: AudioTrack | null = player.queue[1] || null;
   if (!t3 && player.autoplay && t2) {
@@ -87,7 +90,10 @@ export async function prewarmPlayerDecks(player: {
     }
     t3 = player.deck3Track;
   }
-  if (t3) await ensureTrackStreamReady(t3, () => player.emitStateUpdate());
+  if (t3) {
+    await ensureTrackStreamReady(t3, () => player.emitStateUpdate());
+    console.log(`🎯 [Deck 3 Ready] ${t3.artist} — ${t3.title} [${t3.formattedDuration}] (${t3.source.toUpperCase()})`);
+  }
   player.emitStateUpdate();
 }
 

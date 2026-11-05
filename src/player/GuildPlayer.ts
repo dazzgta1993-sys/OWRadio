@@ -207,6 +207,7 @@ export class GuildPlayer extends EventEmitter {
       this.history.push(nextTrack);
       if (this.history.length > 100) this.history.shift();
       savePlaybackHistory(nextTrack, this.guildId);
+      console.log(`▶️ [Deck 1] ${nextTrack.artist} — ${nextTrack.title} [${nextTrack.formattedDuration}] (${nextTrack.source.toUpperCase()}${nextTrack.vibeReason ? ' • ' + nextTrack.vibeReason : ''})`);
       this.emitStateUpdate();
       this.emit('trackStart', nextTrack);
       void this.prewarmDecks();
