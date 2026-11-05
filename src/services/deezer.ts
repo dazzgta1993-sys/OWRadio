@@ -130,9 +130,10 @@ export async function searchArtist(query: string): Promise<DeezerArtistMetadata 
   const data = await deezerGet<{ data: any[] }>(`/search/artist?q=${encodeURIComponent(query)}&limit=5`);
   if (!data?.data || data.data.length === 0) return null;
 
-  // Prefer exact match (case insensitive) if available, otherwise take first
-  const exact = data.data.find((a: any) => a.name.toLowerCase() === query.toLowerCase().trim());
-  const artist = exact || data.data[0];
+  // Sort candidates by fan count so verified international artists take priority
+  const sorted = [...data.data].sort((a: any, b: any) => (b.nb_fan || 0) - (a.nb_fan || 0));
+  const exact = sorted.find((a: any) => a.name.toLowerCase() === query.toLowerCase().trim());
+  const artist = exact || sorted[0];
 
   const rawPic = artist.picture_xl || artist.picture_big || artist.picture_medium || artist.picture || '';
   const { artworkUrl, artworkThumbUrl } = normalizeDeezerArtwork(rawPic);

@@ -350,13 +350,30 @@ export function isTrackEligibleForAutoplay(
 /**
  * Checks whether foreign language playback is locked across the station under the 99.9% English purity guardrail.
  */
-export function isForeignLanguageLocked(lang: TrackLanguage, queuedLanguages?: Set<string>): boolean {
+export function isLikelyForeignTitle(title: string): boolean {
+  if (!title) return false;
+  const lower = title.toLowerCase();
+  // 1. Nordic / Germanic accented characters typical of domestic non-English releases
+  if (/[åäöøæüëï]/.test(lower)) return true;
+  // 2. Non-Latin scripts (Cyrillic, Greek, CJK, Arabic)
+  if (/[\u0400-\u04FF\u3040-\u30FF\u4E00-\u9FFF\u0600-\u06FF]/.test(title)) return true;
+  // 3. Obvious foreign stopwords when appearing as distinct words
+  const foreignStopwords = [
+    'på', 'och', 'som', 'inte', 'med', 'för', 'till', 'är', 'ett', 'har',
+    'der', 'die', 'das', 'und', 'nicht', 'mit', 'für',
+    'avec', 'pour', 'dans', 'les', 'des', 'une'
+  ];
+  const words = lower.split(/[^a-zåäöøæüéèêáàíóúñ]+/);
+  for (const sw of foreignStopwords) {
+    if (words.includes(sw)) return true;
+  }
   return false;
 }
 
-/**
- * Fully asynchronous candidate validator: runs 48h/2h filters + deep NLP lyrics/tag language screening.
- */
+export function isForeignLanguageLocked(lang: TrackLanguage, queuedLanguages?: Set<string>): boolean {
+  return true;
+}
+
 export async function isCandidateEligibleAsync(
   track: { id: string; artist: string; title: string; album?: string; durationSec?: number; isrc?: string },
   queuedSongIds: Set<string>,
@@ -369,20 +386,15 @@ export async function isCandidateEligibleAsync(
     return false;
   }
 
-  // 2. High-Purity English verification via Last.fm tags + lyrics NLP
-  const lang = 'en';
-  if (lang !== 'en') {
-    if (isForeignLanguageLocked(lang, queuedLanguages)) {
-      console.log(`[Curator] 🛑 Foreign track "${track.artist} - ${track.title}" (${lang}) blocked by 24h English purity guardrail.`);
-      return false;
-    }
+  // 2. English purity guardrail: filter out regional foreign domestic tracks
+  if (isLikelyForeignTitle(track.title)) {
+    console.log(`[Curator] 🛡️ Non-English title "${track.artist} - ${track.title}" blocked by English purity guardrail.`);
+    return false;
   }
+
   return true;
 }
 
-/**
- * Aggregates preferences of active non-bot members currently present in the voice room.
- */
 export function getActiveVoiceRoomProfile(memberUserIds: string[]): RoomTasteProfile {
   const baseline = baselineService.getBaseline();
 
@@ -648,46 +660,34 @@ export async function getNextAutoplayTracks(
     }
   }
 
-  // Tier 2: Emergency Dead-Air Prevention (Local Catalog Safety Net)
-  if (results.length < count) {
+  // Tier 2: Vibe-Guarded Fallback (Never blind random cross-genre roulette)
+  if (results.length < count && activeAnchor) {
     try {
-      const localCandidates = sqlite.prepare(`
-        SELECT s.*,
-          (SELECT COUNT(*) FROM playback_history h WHERE h.song_id = s.id) as play_count,
-          (SELECT MAX(played_at) FROM playback_history h WHERE h.song_id = s.id) as last_played
-        FROM songs s
-        ORDER BY play_count ASC, last_played ASC, RANDOM()
-        LIMIT 30
-      `).all() as any[];
-
-      for (const row of localCandidates) {
+      const related = await collaborativeGraph.getRelatedArtists(activeAnchor, 12);
+      const peers = related.map((r: { name: string }) => r.name);
+      for (const peer of peers) {
         if (results.length >= count) break;
-        if (await isCandidateEligibleAsync({ id: row.id, artist: row.artist, title: row.title, album: row.album, durationSec: row.duration_sec }, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
-          queuedSongIds.add(row.id);
-          queuedArtists.add(row.artist.toLowerCase());
-          const normA = normalizeArtist(row.artist).replace(/\s+/g, '');
-          if (normA) queuedArtists.add(normA);
-          queuedDedupeKeys.add(getTrackDedupeKey(row.title, row.artist));
-          results.push({
-            track: {
-              id: row.id,
-              deezerId: row.deezer_id || row.id.replace(/^dz_/, ''),
-              title: row.title,
-              artist: row.artist,
-              album: row.album || undefined,
-              durationSec: row.duration_sec || 180,
-              artworkUrl: row.artwork_url || '',
-              artworkThumbUrl: row.artwork_thumb_url || '',
-              genre: row.genre || undefined,
-              releaseYear: row.release_year || undefined,
-            },
-            curatedBy: 'DJ Harmonic Chain',
-            curationReason: 'Station Catalog Continuity',
-          });
+        if (queuedArtists.has(peer.toLowerCase())) continue;
+        const tracks = await deezer.searchTracks(peer, 6);
+        for (const t of tracks) {
+          if (results.length >= count) break;
+          if (await isCandidateEligibleAsync(t, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
+            queuedSongIds.add(t.id);
+            queuedArtists.add(t.artist.toLowerCase());
+            const normA = normalizeArtist(t.artist).replace(/\s+/g, '');
+            if (normA) queuedArtists.add(normA);
+            queuedDedupeKeys.add(getTrackDedupeKey(t.title, t.artist));
+            results.push({
+              track: t,
+              curatedBy: 'DJ Harmonic Chain',
+              curationReason: `Harmonic peer match from ${activeAnchor}`,
+            });
+            break;
+          }
         }
       }
     } catch (err) {
-      console.warn('[Curator] Emergency fallback error:', (err as Error).message);
+      console.warn('[Curator] Harmonic fallback error:', (err as Error).message);
     }
   }
 
