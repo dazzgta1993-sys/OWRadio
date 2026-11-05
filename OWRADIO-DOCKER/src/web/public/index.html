@@ -3,2442 +3,1093 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>OWRadio • Autonomous Music & Discord Hub</title>
+  <title>OWRadio • Discord & Web Audio Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <style>
     :root {
-      --bg: #090a0f;
-      --card-bg: rgba(18, 20, 29, 0.75);
-      --card-border: rgba(255, 255, 255, 0.08);
-      --accent: #6366f1;
-      --accent-glow: rgba(99, 102, 241, 0.35);
-      --accent-secondary: #ec4899;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
-      --text-subtle: #64748b;
-      --success: #10b981;
-      --warning: #f59e0b;
+      --bg-dark: #0a0b0e;
+      --bg-card: rgba(18, 19, 27, 0.78);
+      --bg-card-hover: rgba(26, 28, 40, 0.9);
+      --bg-input: rgba(0, 0, 0, 0.4);
+      --accent: #9d4edd;
+      --accent-glow: rgba(157, 78, 221, 0.35);
+      --accent-secondary: #c77dff;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --text-subtle: #6b7280;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-focus: rgba(157, 78, 221, 0.6);
+      --success: #22c55e;
       --danger: #ef4444;
-      --badge-ai: linear-gradient(135deg, #6366f1, #a855f7);
-      --badge-wild: linear-gradient(135deg, #ec4899, #f43f5e);
-      --badge-user: linear-gradient(135deg, #3b82f6, #06b6d4);
-      --radius: 16px;
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 6px;
     }
 
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
-    }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
       font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
-      background-image: 
-        radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.12) 0%, transparent 40%),
-        radial-gradient(circle at 85% 85%, rgba(236, 72, 153, 0.1) 0%, transparent 40%);
     }
 
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 24px 20px;
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(157, 78, 221, 0.35);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(157, 78, 221, 0.6);
+    }
+
+    html, body {
+      height: 100vh;
+      max-height: 100vh;
+      overflow: hidden;
+      background: radial-gradient(circle at top left, #161129, #0a0b0e 70%);
+      color: var(--text);
     }
 
     /* Top Navigation Header */
     header {
+      background: rgba(10, 11, 14, 0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 22px;
+      height: 52px;
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: center;
-      margin-bottom: 28px;
-      padding-bottom: 20px;
-      border-bottom: 1px solid var(--card-border);
-      flex-wrap: wrap;
       gap: 16px;
+      flex-shrink: 0;
+      z-index: 50;
     }
 
-    .logo-group {
+    .brand {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+      flex-shrink: 0;
     }
 
-    .logo-icon {
-      width: 40px;
-      height: 40px;
-      background: var(--badge-ai);
+    .brand-logo {
+      width: 34px;
+      height: 34px;
       border-radius: 10px;
+      background: linear-gradient(135deg, #9d4edd, #5a189a);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
-      box-shadow: 0 0 20px var(--accent-glow);
+      font-size: 18px;
+      box-shadow: 0 0 14px var(--accent-glow);
     }
 
-    .logo-title {
-      font-size: 22px;
+    .brand-title {
+      font-size: 1.12rem;
       font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(to right, #fff, #cbd5e1);
+      letter-spacing: -0.4px;
+      background: linear-gradient(90deg, #ffffff, #c77dff);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+      line-height: 1.1;
     }
 
-    /* Level Switcher Navigation */
-    .level-nav {
-      display: flex;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      padding: 4px;
-      border-radius: 12px;
-      gap: 4px;
-    }
-
-    .level-tab {
-      background: none;
-      border: none;
+    .brand-subtitle {
+      font-size: 0.65rem;
       color: var(--text-muted);
-      font-family: inherit;
-      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
       font-weight: 600;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
+    }
+
+    /* Fast-Play Command Search Bar */
+    .header-fast-play {
+      flex: 1;
+      max-width: 600px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      background: rgba(0, 0, 0, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      padding: 3px 6px 3px 14px;
+      gap: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
       transition: all 0.2s ease;
     }
 
-    .level-tab:hover {
+    .header-fast-play:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 14px var(--accent-glow);
+    }
+
+    .search-icon {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .fast-play-input {
+      flex: 1;
+      min-width: 140px;
+      background: transparent;
+      border: none;
+      outline: none;
       color: #fff;
-      background: rgba(255, 255, 255, 0.06);
+      font-size: 0.84rem;
+      font-weight: 500;
     }
 
-    .level-tab.active {
+    .btn-fast-play {
+      background: linear-gradient(135deg, #8b5cf6, #6d28d9);
       color: #fff;
-      background: var(--accent);
-      box-shadow: 0 2px 10px var(--accent-glow);
+      border: none;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+      transition: all 0.2s;
     }
 
-    .level-tab .badge-num {
-      background: rgba(255, 255, 255, 0.2);
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 11px;
+    .btn-fast-play:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.6);
     }
 
-    .status-badge {
+    .btn-fast-queue {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .btn-fast-queue:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .nav-right {
       display: flex;
       align-items: center;
-      gap: 8px;
-      background: rgba(16, 185, 129, 0.12);
-      border: 1px solid rgba(16, 185, 129, 0.25);
-      color: var(--success);
-      padding: 6px 14px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 4px 10px;
       border-radius: 999px;
-      font-size: 13px;
+      background: rgba(34, 197, 94, 0.12);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      color: #4ade80;
       font-weight: 600;
     }
 
     .pulse-dot {
-      width: 8px;
-      height: 8px;
-      background: var(--success);
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
-      animation: pulse 2s infinite;
+      background: #22c55e;
+      box-shadow: 0 0 8px #22c55e;
+      animation: pulseAnim 2s infinite;
     }
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-      70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    @keyframes pulseAnim {
+      0% { opacity: 0.6; }
+      50% { opacity: 1; filter: drop-shadow(0 0 4px #22c55e); }
+      100% { opacity: 0.6; }
     }
 
-    /* Common Card */
-    .card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 24px;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    }
-
-    .btn {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--card-border);
-      color: var(--text);
-      padding: 12px 20px;
-      border-radius: 12px;
-      font-size: 14px;
-      font-weight: 600;
+    .btn-auth-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
       cursor: pointer;
-      display: inline-flex;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-auth-pill:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    /* Main Grid Viewport */
+    main {
+      height: calc(100vh - 52px);
+      max-width: 1560px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 12px 18px;
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      overflow: hidden;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-height: 0;
+      height: 100%;
+    }
+
+    /* Left Deck: Compact Player */
+    .player-deck {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      justify-content: space-between;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .voice-status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .cover-container {
+      width: 100%;
+      max-width: 190px;
+      max-height: 190px;
+      aspect-ratio: 1;
+      margin: 0 auto;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      position: relative;
+      background: #11121a;
+      display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
-      transition: all 0.2s ease;
-      font-family: inherit;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 1;
     }
 
-    .btn:hover {
+    .cover-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: transform 0.3s ease;
+    }
+
+    .cover-placeholder {
+      font-size: 46px;
+      color: rgba(255, 255, 255, 0.15);
+    }
+
+    .track-meta {
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+
+    .track-title {
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-artist {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-badge-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 3px;
+    }
+
+    .curation-pill {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(157, 78, 221, 0.15);
+      border: 1px solid rgba(157, 78, 221, 0.3);
+      color: #d8b4fe;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 280px;
+    }
+
+    /* Seeker Section */
+    .seeker-section {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      cursor: pointer;
+      position: relative;
+      transition: height 0.15s ease;
+    }
+
+    .progress-bar-container:hover {
+      height: 7px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #9d4edd, #c77dff);
+      width: 0%;
+      border-radius: 999px;
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: width 0.25s linear;
+    }
+
+    .time-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Controls Main */
+    .controls-main {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
       background: rgba(255, 255, 255, 0.12);
       border-color: rgba(255, 255, 255, 0.2);
       transform: translateY(-1px);
     }
 
-    .btn-primary {
-      background: var(--accent);
-      border-color: var(--accent);
-      box-shadow: 0 4px 16px var(--accent-glow);
+    .btn-play-pause {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, #9d4edd, #6d28d9);
+      border: none;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: 0 4px 14px var(--accent-glow);
     }
 
-    .btn-primary:hover {
-      background: #4f46e5;
+    .btn-play-pause:hover {
+      background: linear-gradient(135deg, #a855f7, #7c3aed);
+      transform: scale(1.05);
     }
 
-    .btn-icon {
-      padding: 12px;
-      border-radius: 50%;
-    }
-
-    /* ========================================================
-       LEVEL 1: MINIMAL QUICK SEARCH LANDING PAGE
-       ======================================================== */
-    #view-level-1 {
+    /* Vibe Feedback Row */
+    .vibe-feedback-row {
       display: flex;
-      flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 70vh;
-      gap: 32px;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .hero-box {
-      width: 100%;
-      max-width: 760px;
-      text-align: center;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .hero-title {
-      font-size: 38px;
-      font-weight: 800;
-      letter-spacing: -1px;
-      line-height: 1.15;
-      background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .hero-subtitle {
-      font-size: 16px;
-      color: var(--text-muted);
-      max-width: 580px;
-      margin: 0 auto;
-      line-height: 1.5;
-    }
-
-    .hero-input-group {
-      position: relative;
-      width: 100%;
-      margin-top: 8px;
-    }
-
-    .hero-input {
-      width: 100%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 16px;
-      padding: 18px 24px;
-      padding-left: 54px;
-      padding-right: 140px;
-      color: #fff;
-      font-size: 16px;
-      font-family: inherit;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-      transition: all 0.25s ease;
-    }
-
-    .hero-input:focus {
-      outline: none;
-      background: rgba(255, 255, 255, 0.08);
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-glow), 0 10px 35px rgba(0, 0, 0, 0.45);
-    }
-
-    .hero-input-icon {
-      position: absolute;
-      left: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 20px;
-      color: var(--text-muted);
-      pointer-events: none;
-    }
-
-    .hero-actions {
-      display: flex;
-      justify-content: center;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
-
-    .suggestion-chips {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
       gap: 8px;
-      margin-top: 4px;
+      flex-shrink: 0;
     }
 
-    .chip {
+    .vibe-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
       background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      padding: 6px 14px;
+      border: 1px solid var(--border);
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 500;
+      font-size: 0.72rem;
+      color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.2s;
     }
 
-    .chip:hover {
-      background: rgba(99, 102, 241, 0.15);
-      border-color: rgba(99, 102, 241, 0.4);
+    .vibe-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
       color: #fff;
-      transform: translateY(-1px);
     }
 
-    .hero-feedback {
-      font-size: 13px;
-      min-height: 20px;
-      color: var(--accent);
-      font-weight: 600;
-      transition: opacity 0.2s;
-    }
-
-    /* Level 1 Bottom Mini-Player Bar */
-    .mini-player-card {
+    /* Browser Monitor & Volume */
+    .audio-monitor-btn {
       width: 100%;
-      max-width: 760px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      padding: 16px 20px;
-      background: rgba(18, 20, 29, 0.85);
-      border: 1px solid var(--card-border);
-      border-radius: 14px;
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
-    }
-
-    .mini-meta {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      min-width: 0;
-      flex: 1;
-    }
-
-    .mini-art {
-      width: 48px;
-      height: 48px;
-      border-radius: 8px;
-      object-fit: cover;
-      background: #111;
-    }
-
-    .mini-info {
-      min-width: 0;
-      flex: 1;
-    }
-
-    .mini-title {
-      font-size: 14px;
+      padding: 6px 10px;
+      background: rgba(157, 78, 221, 0.08);
+      border: 1px solid rgba(157, 78, 221, 0.25);
+      border-radius: var(--radius-md);
+      font-size: 0.74rem;
       font-weight: 700;
-      color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .mini-artist {
-      font-size: 12px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .mini-controls {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    /* ========================================================
-       LEVEL 2: STUDIO DASHBOARD
-       ======================================================== */
-    #view-level-2 {
-      display: none;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: 1.2fr 0.8fr;
-      gap: 28px;
-    }
-
-    @media (max-width: 900px) {
-      .dashboard-grid {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .player-hero {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .artwork-wrapper {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 1;
-      border-radius: 14px;
-      overflow: hidden;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-      max-height: 400px;
-    }
-
-    .artwork-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      transition: transform 0.4s ease;
-    }
-
-    .curation-pill {
-      position: absolute;
-      top: 14px;
-      left: 14px;
-      background: var(--badge-ai);
-      color: #fff;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 5px 10px;
-      border-radius: 8px;
-      backdrop-filter: blur(8px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .track-meta {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .track-title {
-      font-size: 22px;
-      font-weight: 800;
-      color: #fff;
-      line-height: 1.2;
-    }
-
-    .track-artist {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-muted);
-    }
-
-    .curation-reason {
-      font-size: 12px;
-      color: #a5b4fc;
-      font-style: italic;
-      margin-top: 2px;
-    }
-
-    /* Progress Bar */
-    .progress-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .progress-bar-bg {
-      width: 100%;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .progress-bar-fill {
-      width: 0%;
-      height: 100%;
-      background: linear-gradient(to right, var(--accent), var(--accent-secondary));
-      border-radius: 999px;
-      transition: width 0.3s linear;
-    }
-
-    .progress-times {
-      display: flex;
-      justify-content: space-between;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--text-subtle);
-    }
-
-    .controls-row {
+      color: #d8b4fe;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 16px;
-    }
-
-    /* Radio Broadcast Banner */
-    .radio-banner {
-      background: rgba(99, 102, 241, 0.08);
-      border: 1px solid rgba(99, 102, 241, 0.2);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      flex-wrap: wrap;
-    }
-
-    .radio-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .radio-icon {
-      font-size: 22px;
-    }
-
-    /* Sidebar Column */
-    .sidebar-col {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .section-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .listeners-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .listener-pill {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid var(--card-border);
-      padding: 5px 10px;
-      border-radius: 999px;
-      font-size: 12px;
-      color: #e2e8f0;
-      display: flex;
-      align-items: center;
       gap: 6px;
+      transition: all 0.2s;
+      flex-shrink: 0;
     }
 
-    .queue-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-height: 440px;
-      overflow-y: auto;
-    }
-
-    .queue-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px 10px;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      transition: background 0.2s;
-    }
-
-    .queue-item:hover {
-      background: rgba(255, 255, 255, 0.07);
-    }
-
-    .queue-thumb {
-      width: 40px;
-      height: 40px;
-      border-radius: 6px;
-      object-fit: cover;
-    }
-
-    .queue-meta {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .queue-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #fff;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .queue-artist {
-      font-size: 11px;
-      color: var(--text-muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .queue-badge {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 6px;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      color: #cbd5e1;
-    }
-
-    /* ========================================================
-       LEVEL 3: BRAIN LOGS & OBSERVABILITY
-       ======================================================== */
-    #view-level-3 {
-      display: none;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .brain-subnav {
-      display: flex;
-      gap: 8px;
-      margin: 20px 0 24px 0;
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    /* Engine Switcher Ribbon */
-    .engine-switcher-box {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-      padding: 6px 12px;
-      border-radius: 12px;
-    }
-
-    .engine-switcher-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .engine-btn-group {
-      display: flex;
-      gap: 6px;
-    }
-
-    .engine-toggle-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid transparent;
-      color: var(--text-muted);
-      font-family: inherit;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .engine-toggle-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .engine-toggle-btn.active.engine-embedding {
-      color: #38bdf8;
-      background: rgba(56, 189, 248, 0.18);
-      border-color: rgba(56, 189, 248, 0.5);
-      box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
-    }
-
-    .engine-toggle-btn.active.engine-jev {
-      color: #fbbf24;
-      background: rgba(245, 158, 11, 0.18);
-      border-color: rgba(245, 158, 11, 0.5);
-      box-shadow: 0 0 14px rgba(245, 158, 11, 0.35);
-    }
-
-    .engine-toggle-btn.active.engine-llm {
-      color: #c084fc;
-      background: rgba(192, 132, 252, 0.18);
-      border-color: rgba(192, 132, 252, 0.5);
-      box-shadow: 0 0 14px rgba(192, 132, 252, 0.35);
-    }
-
-    .engine-toggle-btn.active.engine-hybrid {
-      color: #34d399;
-      background: rgba(52, 211, 153, 0.18);
-      border-color: rgba(52, 211, 153, 0.5);
-      box-shadow: 0 0 14px rgba(52, 211, 153, 0.35);
-    }
-
-    /* Toast Notification Container */
-    .toast-container {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      pointer-events: none;
-    }
-
-    .toast-msg {
-      background: rgba(18, 20, 29, 0.95);
-      border: 1px solid var(--accent);
-      color: #fff;
-      padding: 12px 20px;
-      border-radius: 10px;
-      font-size: 13px;
-      font-weight: 600;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-      animation: fadeIn 0.3s ease;
-      pointer-events: auto;
-    }
-
-    /* ========================================================
-       TASTE RADAR 50K PROGRESS & RADAR BADGES
-       ======================================================== */
-    .taste-radar-card {
-      background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.95) 100%);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 14px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .taste-radar-card::before {
-      content: '';
-      position: absolute;
-      top: -40px;
-      right: -40px;
-      width: 140px;
-      height: 140px;
-      background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .taste-radar-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-
-    .taste-radar-badge-icon {
-      font-size: 22px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 42px;
-      height: 42px;
-      background: rgba(56, 189, 248, 0.15);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 10px;
-    }
-
-    .radar-live-tag {
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.8px;
-      padding: 3px 9px;
-      border-radius: 20px;
-      background: rgba(52, 211, 153, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(52, 211, 153, 0.4);
-      text-transform: uppercase;
-      animation: pulseGlow 2s infinite;
-    }
-
-    @keyframes pulseGlow {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
-    }
-
-    .taste-radar-metrics {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-
-    .taste-radar-metric {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 10px;
-      padding: 12px 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .taste-radar-metric-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .taste-radar-metric-val {
-      font-size: 20px;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-      color: #f1f5f9;
-    }
-
-    .radar-progress-bar-bg {
-      width: 100%;
-      height: 12px;
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 12px;
-      position: relative;
-    }
-
-    .radar-progress-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #38bdf8 0%, #818cf8 50%, #34d399 100%);
-      border-radius: 10px;
-      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.5);
-    }
-
-    .taste-radar-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 12px;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    /* Header Radar Pill */
-    .radar-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      border-radius: 20px;
-      padding: 6px 14px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-
-    .radar-pill:hover {
-      background: rgba(56, 189, 248, 0.18);
-      border-color: rgba(56, 189, 248, 0.6);
-      transform: translateY(-1px);
-    }
-
-    .radar-pill-text {
-      font-size: 12px;
-      font-weight: 600;
-      font-family: 'JetBrains Mono', monospace;
-      color: #38bdf8;
-    }
-
-    .radar-mini-bar {
-      width: 48px;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .radar-mini-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #38bdf8, #34d399);
-      border-radius: 4px;
-      transition: width 0.5s ease;
-    }
-
-    .brain-tab-btn {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      font-family: inherit;
-      font-size: 13px;
-      font-weight: 600;
-      padding: 8px 16px;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: all 0.2s ease;
-    }
-
-    .brain-tab-btn:hover {
-      color: #fff;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .brain-tab-btn.active {
-      background: var(--accent);
-      color: #fff;
+    .audio-monitor-btn.active {
+      background: rgba(157, 78, 221, 0.25);
       border-color: var(--accent);
-      box-shadow: 0 2px 10px var(--accent-glow);
-    }
-
-    .brain-kpi-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .brain-kpi-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 18px 20px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .brain-kpi-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    .brain-kpi-value {
-      font-size: 22px;
-      font-weight: 800;
       color: #fff;
-      font-family: 'JetBrains Mono', monospace;
+      box-shadow: 0 0 10px var(--accent-glow);
     }
 
-    .brain-kpi-sub {
-      font-size: 11px;
-      color: var(--text-subtle);
-    }
-
-    .brain-interaction-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      margin-bottom: 16px;
-      overflow: hidden;
-      transition: border-color 0.2s ease;
-    }
-
-    .brain-interaction-card:hover {
-      border-color: rgba(99, 102, 241, 0.4);
-    }
-
-    .interaction-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px 18px;
-      background: rgba(255, 255, 255, 0.03);
-      border-bottom: 1px solid var(--card-border);
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-
-    .interaction-meta {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .interaction-body {
-      padding: 16px 18px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    @media (max-width: 900px) {
-      .interaction-body {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .code-box {
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 12px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      line-height: 1.5;
-      color: #cbd5e1;
-      max-height: 320px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      word-break: break-all;
-    }
-
-    .code-box-header {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .badge-success {
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .badge-timeout {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .badge-fallback {
-      background: rgba(245, 158, 11, 0.15);
-      color: #fbbf24;
-      border: 1px solid rgba(245, 158, 11, 0.3);
-      padding: 3px 8px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    .brain-table-container {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      overflow-x: auto;
-    }
-
-    .brain-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-      text-align: left;
-    }
-
-    .brain-table th {
-      background: rgba(255, 255, 255, 0.04);
-      padding: 12px 16px;
-      color: var(--text-muted);
-      font-weight: 600;
-      border-bottom: 1px solid var(--card-border);
-    }
-
-    .brain-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-      color: #cbd5e1;
-    }
-
-    .brain-table tr:hover td {
-      background: rgba(255, 255, 255, 0.02);
-    }
-
-    .score-positive {
-      color: #34d399;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .score-negative {
-      color: #f87171;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .score-neutral {
-      color: var(--text-subtle);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .settings-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 20px;
-      margin-top: 16px;
-    }
-
-    .settings-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 24px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .settings-card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .settings-card-title {
-      font-size: 16px;
-      font-weight: 700;
+    .volume-row {
       display: flex;
       align-items: center;
       gap: 8px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
     }
 
-    .badge-tag {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 8px;
+    .volume-slider {
+      flex: 1;
+      height: 4px;
+      accent-color: var(--accent);
+      background: rgba(255, 255, 255, 0.1);
       border-radius: 999px;
-      text-transform: uppercase;
-      background: rgba(99, 102, 241, 0.2);
-      color: #a5b4fc;
-      border: 1px solid rgba(99, 102, 241, 0.3);
+      cursor: pointer;
     }
 
-    .settings-list {
+    /* Right Deck: Tabbed Studio Deck */
+    .hub-deck {
       display: flex;
       flex-direction: column;
-      gap: 12px;
-      font-size: 13px;
+      min-height: 0;
+      height: 100%;
+      padding: 0;
+      overflow: hidden;
     }
 
-    .settings-row {
+    .tabs-header {
       display: flex;
-      justify-content: space-between;
       align-items: center;
-      padding-bottom: 8px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .settings-label {
-      color: var(--text-muted);
-    }
-
-    .settings-val {
-      font-family: 'JetBrains Mono', monospace;
-      color: #fff;
-      font-weight: 500;
-    }
-
-    .code-pill {
-      background: rgba(0, 0, 0, 0.4);
-      padding: 4px 8px;
-      border-radius: 6px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      color: #38bdf8;
-    }
-
-    /* Modal */
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(8px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-box {
-      background: #141721;
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      width: 100%;
-      max-width: 500px;
-      padding: 24px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
-    }
-
-    .tab-group {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--card-border);
-      padding-bottom: 10px;
+      gap: 6px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: rgba(0, 0, 0, 0.2);
     }
 
     .tab-btn {
       background: none;
       border: none;
       color: var(--text-muted);
+      font-size: 0.8rem;
       font-weight: 600;
-      font-size: 13px;
       padding: 6px 12px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .tab-btn:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.05);
     }
 
     .tab-btn.active {
-      color: var(--accent);
-      border-bottom: 2px solid var(--accent);
-    }
-
-    .input-field {
-      width: 100%;
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--card-border);
-      border-radius: 10px;
-      padding: 12px 14px;
       color: #fff;
-      font-size: 14px;
-      margin-bottom: 16px;
-      font-family: inherit;
+      background: rgba(157, 78, 221, 0.2);
+      border: 1px solid rgba(157, 78, 221, 0.35);
     }
 
-    .input-field:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-glow);
-    }
-
-    /* ========================================================
-       FEATURE FLAGS & TOGGLE SWITCHES
-       ======================================================== */
-    .switch {
-      position: relative;
-      display: inline-block;
-      width: 44px;
-      height: 24px;
-      flex-shrink: 0;
-    }
-
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-
-    .slider {
-      position: absolute;
-      cursor: pointer;
-      inset: 0;
-      background-color: rgba(255, 255, 255, 0.12);
-      transition: all 0.25s ease;
-      border-radius: 24px;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 2px;
-      bottom: 2px;
-      background-color: #f8fafc;
-      transition: all 0.25s ease;
-      border-radius: 50%;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-
-    input:checked + .slider {
-      background-color: var(--accent);
-      border-color: #818cf8;
-      box-shadow: 0 0 14px var(--accent-glow);
-    }
-
-    input:checked + .slider:before {
-      transform: translateX(20px);
-    }
-
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 16px;
-      margin-top: 16px;
-    }
-
-    .feature-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      gap: 12px;
-      transition: all 0.2s ease;
-    }
-
-    .feature-card:hover {
-      background: rgba(255, 255, 255, 0.05);
-      border-color: rgba(99, 102, 241, 0.35);
-    }
-
-    .feature-card.enabled {
-      border-left: 3px solid var(--accent);
-    }
-
-    .feature-card.disabled {
-      opacity: 0.6;
-      border-left: 3px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .feature-card-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 12px;
-    }
-
-    .feature-card-meta {
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-    }
-
-    .feature-icon {
-      font-size: 22px;
-      width: 38px;
-      height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 8px;
-      flex-shrink: 0;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .feature-title {
-      font-size: 13px;
-      font-weight: 700;
-      color: #fff;
-      line-height: 1.3;
-    }
-
-    .feature-desc {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      line-height: 1.4;
-      margin-top: 4px;
-    }
-
-    .feature-card-footer {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 11px;
-      padding-top: 10px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .feature-badge-category {
-      padding: 2px 8px;
-      border-radius: 6px;
-      font-weight: 600;
-      text-transform: uppercase;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      background: rgba(99, 102, 241, 0.15);
-      color: #a5b4fc;
-      border: 1px solid rgba(99, 102, 241, 0.3);
-    }
-
-    .feature-status-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600;
-      font-size: 11px;
-    }
-
-    .status-on {
-      color: #34d399;
-    }
-
-    .status-off {
-      color: var(--text-subtle);
-    }
-
-    .features-filter-bar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .btn-filter {
-      background: rgba(255, 255, 255, 0.04);
-      border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      padding: 6px 12px;
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: inherit;
-      transition: all 0.2s ease;
-    }
-
-    .btn-filter:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: #fff;
-    }
-
-    .btn-filter.active {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-      box-shadow: 0 0 10px var(--accent-glow);
-    }
-
-    /* ========================================================
-       LIVE WAVEFORM CONTAINER & VISUAL DROP CUES
-       ======================================================== */
-    .waveform-container {
-      background: rgba(0, 0, 0, 0.45);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 12px;
-      padding: 12px 16px;
-      margin: 14px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .waveform-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .waveform-label {
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--text-muted);
-      letter-spacing: 0.5px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .waveform-pulse {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: #38bdf8;
-      box-shadow: 0 0 8px #38bdf8;
-      animation: pulse 1.5s infinite;
-    }
-
-    .waveform-cue {
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: rgba(56, 189, 248, 0.15);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .waveform-canvas {
-      width: 100%;
-      height: 60px;
-      display: block;
-      border-radius: 6px;
-    }
-
-    .waveform-footer {
-      display: flex;
-      justify-content: space-between;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--text-subtle);
-    }
-
-    /* ========================================================
-       BRAIN MATRIX • NEURAL EXECUTION STACK (LEVEL 2)
-       ======================================================== */
-    .brains-matrix-card {
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 14px;
-      padding: 16px 18px;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .brains-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      padding-bottom: 10px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .brains-title-group {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .brains-icon {
-      font-size: 20px;
-    }
-
-    .brains-title {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: #f8fafc;
-    }
-
-    .brains-subtitle {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 1px;
-    }
-
-    .brains-active-badge {
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid rgba(16, 185, 129, 0.35);
-      color: #34d399;
-      font-size: 11px;
-      font-weight: 700;
-      font-family: 'JetBrains Mono', monospace;
-      padding: 3px 10px;
-      border-radius: 999px;
-      letter-spacing: 0.5px;
-      transition: all 0.2s ease;
-    }
-
-    .brains-pills-container {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .brains-category-section {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .brains-category-label {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      color: #64748b;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .brains-category-pills {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-
-    .brain-pill {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 11px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
-      user-select: none;
-    }
-
-    /* Dormant / Inactive Pill */
-    .brain-pill.is-off {
-      background: rgba(255, 255, 255, 0.025);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      color: #64748b;
-      opacity: 0.45;
-    }
-
-    .brain-pill.is-off:hover {
-      opacity: 0.95;
-      background: rgba(255, 255, 255, 0.06);
-      border-color: rgba(255, 255, 255, 0.18);
-      color: #cbd5e1;
-      transform: translateY(-1px);
-    }
-
-    .brain-pill.is-off .pill-dot {
-      color: #475569;
-      font-size: 9px;
-    }
-
-    /* Active / Lit Pill */
-    .brain-pill.is-active {
-      opacity: 1;
-      font-weight: 700;
-      color: #ffffff;
-      transform: translateY(0);
-    }
-
-    .brain-pill.is-active:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.15);
-    }
-
-    .brain-pill.is-active .pill-dot {
-      font-size: 9px;
-      animation: pulseDot 2s infinite ease-in-out;
-    }
-
-    /* Category color variants when active */
-    .brain-pill.is-active.cat-engine {
-      background: rgba(168, 85, 247, 0.18);
-      border: 1px solid rgba(168, 85, 247, 0.45);
-      box-shadow: 0 0 10px rgba(168, 85, 247, 0.25);
-    }
-    .brain-pill.is-active.cat-engine .pill-dot {
-      color: #c084fc;
-      text-shadow: 0 0 6px #c084fc;
-    }
-
-    .brain-pill.is-active.cat-harmonic {
-      background: rgba(16, 185, 129, 0.18);
-      border: 1px solid rgba(16, 185, 129, 0.45);
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);
-    }
-    .brain-pill.is-active.cat-harmonic .pill-dot {
-      color: #34d399;
-      text-shadow: 0 0 6px #34d399;
-    }
-
-    .brain-pill.is-active.cat-consensus {
-      background: rgba(6, 182, 212, 0.18);
-      border: 1px solid rgba(6, 182, 212, 0.45);
-      box-shadow: 0 0 10px rgba(6, 182, 212, 0.25);
-    }
-    .brain-pill.is-active.cat-consensus .pill-dot {
-      color: #38bdf8;
-      text-shadow: 0 0 6px #38bdf8;
-    }
-
-    .brain-pill.is-active.cat-purity {
-      background: rgba(245, 158, 11, 0.18);
-      border: 1px solid rgba(245, 158, 11, 0.45);
-      box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
-    }
-    .brain-pill.is-active.cat-purity .pill-dot {
-      color: #fbbf24;
-      text-shadow: 0 0 6px #fbbf24;
-    }
-
-    .brain-pill.is-active.cat-muscle {
-      background: rgba(244, 63, 94, 0.18);
-      border: 1px solid rgba(244, 63, 94, 0.45);
-      box-shadow: 0 0 10px rgba(244, 63, 94, 0.25);
-    }
-    .brain-pill.is-active.cat-muscle .pill-dot {
-      color: #fb7185;
-      text-shadow: 0 0 6px #fb7185;
-    }
-
-    @keyframes pulseDot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.2); }
-    }
-
-    /* Tooltip Popover */
-    .brain-tooltip {
-      position: absolute;
-      bottom: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
-      width: 290px;
-      background: #090d16;
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      border-radius: 10px;
-      padding: 12px;
-      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.05);
-      pointer-events: none;
-      opacity: 0;
-      visibility: hidden;
-      transition: opacity 0.18s ease, transform 0.18s ease;
-      z-index: 1000;
-      text-align: left;
-      backdrop-filter: blur(20px);
-    }
-
-    .brain-tooltip::after {
-      content: '';
-      position: absolute;
-      top: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      border-width: 6px;
-      border-style: solid;
-      border-color: #090d16 transparent transparent transparent;
-    }
-
-    .brain-pill:hover .brain-tooltip {
-      opacity: 1;
-      visibility: visible;
-      transform: translateX(-50%) translateY(-2px);
-    }
-
-    /* Edge alignment so tooltips never clip off-screen */
-    .brains-category-pills .brain-pill:first-child .brain-tooltip,
-    .brains-category-pills .brain-pill:nth-child(2) .brain-tooltip {
-      left: 0;
-      transform: none;
-    }
-    .brains-category-pills .brain-pill:first-child .brain-tooltip::after,
-    .brains-category-pills .brain-pill:nth-child(2) .brain-tooltip::after {
-      left: 24px;
-      transform: none;
-    }
-
-    .brains-category-pills .brain-pill:last-child .brain-tooltip {
-      left: auto;
-      right: 0;
-      transform: none;
-    }
-    .brains-category-pills .brain-pill:last-child .brain-tooltip::after {
-      left: auto;
-      right: 24px;
-      transform: none;
-    }
-
-    .tooltip-head {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-      padding-bottom: 6px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .tooltip-title {
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: 0.4px;
-      color: #f8fafc;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-    }
-
-    .tooltip-badge {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .tooltip-badge.badge-active {
-      background: rgba(16, 185, 129, 0.2);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.4);
-    }
-
-    .tooltip-badge.badge-off {
-      background: rgba(255, 255, 255, 0.06);
-      color: #94a3b8;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .tooltip-desc {
-      font-size: 11px;
-      color: #cbd5e1;
-      line-height: 1.45;
-      margin-bottom: 8px;
-    }
-
-    .tooltip-telemetry {
-      font-size: 10px;
-      font-family: 'JetBrains Mono', monospace;
-      background: rgba(0, 0, 0, 0.45);
-      border-radius: 6px;
-      padding: 6px 8px;
-      border-left: 2px solid #64748b;
-      color: #94a3b8;
-      line-height: 1.4;
-    }
-
-    .tooltip-telemetry.is-active {
-      border-left-color: #34d399;
-      color: #a7f3d0;
-      background: rgba(16, 185, 129, 0.08);
-    }
-
-    /* ========================================================
-       6-AXIS TASTE RADAR CHART CARD (LEVEL 3)
-       ======================================================== */
-    .taste-chart-card {
-      background: linear-gradient(135deg, rgba(20, 24, 38, 0.8) 0%, rgba(12, 14, 24, 0.95) 100%);
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      border-radius: 14px;
-      padding: 20px 24px;
-      margin-bottom: 24px;
-      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.4);
-    }
-
-    .taste-chart-body {
-      display: grid;
-      grid-template-columns: 420px 1fr;
-      gap: 24px;
-      align-items: center;
-      margin-top: 16px;
-    }
-
-    @media (max-width: 900px) {
-      .taste-chart-body {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .taste-radar-canvas {
-      width: 100%;
-      max-width: 420px;
-      height: 360px;
-      display: block;
-      margin: 0 auto;
-    }
-
-    .taste-dim-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .taste-dim-row {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .taste-dim-meta {
-      display: flex;
-      justify-content: space-between;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .taste-dim-bar-bg {
-      height: 6px;
-      background: rgba(255, 255, 255, 0.06);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .taste-dim-bar-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #6366f1, #38bdf8);
-      border-radius: 3px;
-      transition: width 0.4s ease;
-    }
-
-    /* ========================================================
-       DYNAMIC RUNTIME SETTINGS & CONSOLE WIDGETS
-       ======================================================== */
-    .config-settings-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-      gap: 20px;
-      margin-bottom: 24px;
-    }
-
-    .config-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: var(--radius);
-      padding: 22px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-    }
-
-    .config-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .config-card-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .config-item {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .config-item:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
-    .config-item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .config-item-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #f1f5f9;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .config-item-desc {
-      font-size: 11px;
-      color: var(--text-muted);
-      line-height: 1.35;
-    }
-
-    .config-item-control {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-top: 4px;
-    }
-
-    .config-slider {
-      flex: 1;
-      height: 6px;
-      border-radius: 3px;
+    .tab-badge {
       background: rgba(255, 255, 255, 0.12);
-      outline: none;
-      cursor: pointer;
-      accent-color: #6366f1;
+      font-size: 0.68rem;
+      padding: 1px 6px;
+      border-radius: 999px;
     }
 
-    .config-badge {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 6px;
-      background: rgba(99, 102, 241, 0.15);
-      color: #a5b4fc;
-      border: 1px solid rgba(99, 102, 241, 0.3);
-      min-width: 52px;
-      text-align: center;
+    .tab-panel {
+      display: none;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 12px 14px;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    /* Panel Content Styles */
+    .panel-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 4px;
       flex-shrink: 0;
     }
 
-    .config-reset-btn {
-      background: none;
-      border: none;
+    .btn-action-small {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
       color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      font-size: 13px;
-      padding: 2px 5px;
-      border-radius: 4px;
       transition: all 0.2s;
     }
 
-    .config-reset-btn:hover {
+    .btn-action-small:hover {
+      background: rgba(255, 255, 255, 0.12);
       color: #fff;
-      background: rgba(255, 255, 255, 0.1);
     }
 
-    .config-radio-group {
+    .btn-action-small.danger:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: #f87171;
+    }
+
+    .up-next-card {
       display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: rgba(157, 78, 221, 0.08);
+      border: 1px solid rgba(157, 78, 221, 0.25);
+      border-radius: var(--radius-md);
+      font-size: 0.78rem;
+      flex-shrink: 0;
+    }
+
+    .track-list {
+      display: flex;
+      flex-direction: column;
       gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .config-radio-pill {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 999px;
-      padding: 4px 10px;
-      font-size: 11px;
-      color: var(--text-muted);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-weight: 600;
-    }
-
-    .config-radio-pill:hover {
-      border-color: rgba(99, 102, 241, 0.5);
-      color: #fff;
-    }
-
-    .config-radio-pill.active {
-      background: #6366f1;
-      border-color: #6366f1;
-      color: #fff;
-      box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-    }
-
-    .config-select {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      border-radius: 8px;
-      padding: 5px 10px;
-      color: #fff;
-      font-size: 12px;
-      outline: none;
-      cursor: pointer;
       flex: 1;
     }
 
-    .config-select option {
-      background: #1e1e2e;
+    .track-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      transition: all 0.2s;
+    }
+
+    .track-row:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .track-index {
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      font-family: 'JetBrains Mono', monospace;
+      width: 18px;
+      text-align: center;
+    }
+
+    .track-thumb {
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      object-fit: cover;
+      background: #111;
+      flex-shrink: 0;
+    }
+
+    .track-details {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .track-row-title {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-row-artist {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .track-row-time {
+      font-size: 0.72rem;
+      color: var(--text-subtle);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .btn-row-del {
+      background: none;
+      border: none;
+      color: var(--text-subtle);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+
+    .btn-row-del:hover {
+      color: var(--danger);
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      color: var(--text-subtle);
+      gap: 8px;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    /* Settings Box */
+    .settings-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .settings-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .settings-card-title {
+      font-size: 0.85rem;
+      font-weight: 700;
       color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .settings-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    /* Modals & Toasts */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .modal-box {
+      background: #13141f;
+      border: 1px solid rgba(157, 78, 221, 0.3);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .modal-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+    }
+
+    .modal-input {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 10px 14px;
+      color: #fff;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    .modal-input:focus {
+      border-color: var(--accent);
+    }
+
+    .toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 200;
+      pointer-events: none;
+    }
+
+    .toast {
+      background: rgba(18, 19, 27, 0.95);
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: var(--radius-md);
+      font-size: 0.82rem;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      animation: toastIn 0.3s ease;
+      pointer-events: auto;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes toastIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <!-- Header -->
-    <header>
-      <div class="logo-group">
-        <div class="logo-icon">⚡</div>
-        <div>
-          <div class="logo-title">OWRadio</div>
-          <div style="font-size: 11px; color: var(--text-subtle); letter-spacing: 0.5px;">OPEN WEB RADIO & DISCORD AUDIO ENGINE</div>
+
+  <!-- Top Navigation Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">⚡</div>
+      <div>
+        <div class="brand-title">OWRadio</div>
+        <div class="brand-subtitle">Discord &amp; Web Audio Engine</div>
+      </div>
+    </div>
+
+    <!-- Center Command Search Bar -->
+    <div class="header-fast-play">
+      <span class="search-icon">🔍</span>
+      <input 
+        type="text" 
+        id="fastPlayInput" 
+        class="fast-play-input" 
+        placeholder="Search track, artist, album, paste YouTube/Spotify link..." 
+        onkeydown="if(event.key==='Enter') executeFastPlay(true)"
+      />
+      <button class="btn-fast-play" onclick="executeFastPlay(true)" title="Play immediately">▶ Play</button>
+      <button class="btn-fast-queue" onclick="executeFastPlay(false)" title="Add to queue">+ Queue</button>
+    </div>
+
+    <div class="nav-right">
+      <div class="status-pill">
+        <div class="pulse-dot"></div>
+        <span id="liveStatusText">LIVE BROADCAST</span>
+      </div>
+      <button class="btn-auth-pill" id="authBtn" onclick="openAuthModal()">
+        <span id="authIcon">🔐</span>
+        <span id="authLabel">Admin</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Viewport Grid -->
+  <main>
+    <!-- Left Deck: Compact Player -->
+    <div class="card player-deck">
+      <div class="voice-status-bar">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span>🔊</span>
+          <span id="voiceStatusText">Broadcasting 24/7</span>
+        </div>
+        <span id="codecBadge" style="font-size:0.68rem; color:var(--text-subtle);">MP3 192k Live</span>
+      </div>
+
+      <div class="cover-container">
+        <img id="trackCover" class="cover-img" src="" alt="Album Art" style="display:none;" />
+        <div id="coverPlaceholder" class="cover-placeholder">🎵</div>
+      </div>
+
+      <div class="track-meta">
+        <div class="track-title" id="trackTitle">Connecting to Station...</div>
+        <div class="track-artist" id="trackArtist">Autonomous Harmonic DJ</div>
+        <div class="track-badge-row">
+          <span class="curation-pill" id="curationPill">✨ DJ Harmonic Chain: Active</span>
         </div>
       </div>
 
-      <nav class="level-nav">
-        <button id="tab-btn-player" class="level-tab active" data-level="2" onclick="switchLevel(2)">
-          🎵 Studio Player
-        </button>
-        <button id="tab-btn-settings" class="level-tab" data-level="4" onclick="switchLevel(4)">
-          ⚙️ Settings
-        </button>
-      </nav>
-
-      <div style="display: flex; gap: 10px; align-items: center;">
-        
-          </div>
+      <!-- Seeker Section -->
+      <div class="seeker-section">
+        <div class="progress-bar-container" id="progressBar" onclick="onSeekerClick(event)" title="Click to seek">
+          <div class="progress-bar-fill" id="progressFill"></div>
         </div>
-        <button class="btn btn-primary" style="padding: 8px 14px; font-size: 13px;" onclick="openModal()">+ Add Track</button>
-        <div id="auth-status-container" style="display: flex; align-items: center;">
-          <button id="auth-btn" class="btn" style="padding: 7px 12px; font-size: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); display: flex; align-items: center; gap: 6px; cursor: pointer;" onclick="handleAuthButtonClick()">
-            <span id="auth-btn-icon">🔐</span> <span id="auth-btn-text">Admin Login</span>
-          </button>
-        </div>
-        <div class="status-badge">
-          <div class="pulse-dot"></div>
-          <span id="server-status">LIVE SYNC</span>
+        <div class="time-labels">
+          <span id="timeElapsed">0:00</span>
+          <span id="timeTotal">0:00</span>
         </div>
       </div>
-    </header>
 
-    <!-- ========================================================
-         LEVEL 1: MINIMAL QUICK SEARCH LANDING PAGE
-         ======================================================== -->
-        <div id="view-level-2" style="display: block;">
-      <!-- Universal Fast-Play Bar -->
-      <div class="card" style="margin-bottom: 24px; padding: 14px 20px; display: flex; align-items: center; gap: 14px; background: rgba(18, 20, 29, 0.9); border-color: rgba(99, 102, 241, 0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
-        <span style="font-size: 18px; color: var(--accent);">🔍</span>
-        <input 
-          id="fast-play-input" 
-          type="text" 
-          placeholder="Search any song title, artist, album, or paste YouTube/Spotify link..." 
-          style="flex: 1; background: transparent; border: none; outline: none; font-size: 14px; color: #fff; font-family: inherit;"
-          onkeydown="if(event.key === 'Enter') submitFastPlay()"
-        >
-        <button class="btn btn-primary" onclick="submitFastPlay()" style="padding: 10px 22px; font-weight: 700; white-space: nowrap;">
-          + Add to Queue
+      <!-- Center Controls -->
+      <div class="controls-main">
+        <button class="btn-icon" title="Stop Playback" onclick="sendPlayerAction('stop')">⏹</button>
+        <button class="btn-icon" title="Shuffle Queue" onclick="sendPlayerAction('shuffle')">🔀</button>
+        <button class="btn-icon btn-play-pause" id="btnPlayPause" title="Play / Pause" onclick="togglePlayPause()">▶</button>
+        <button class="btn-icon" title="Skip Track" onclick="sendPlayerAction('skip')">⏭</button>
+      </div>
+
+      <!-- Vibe Feedback -->
+      <div class="vibe-feedback-row">
+        <button class="vibe-btn" onclick="sendPlayerAction('like')" title="Thumbs Up: Play more like this artist">
+          👍 <span>Love Vibe</span>
+        </button>
+        <button class="vibe-btn" onclick="sendPlayerAction('dislike')" title="Thumbs Down: Skip and avoid artist">
+          👎 <span>Skip &amp; Cool</span>
         </button>
       </div>
-      <div class="dashboard-grid">
-        <!-- Main Player View -->
-        <div class="player-hero card">
-          <div class="artwork-wrapper">
-            <img id="track-art" class="artwork-img" src="https://e-cdn-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/1400x1400-000000-80-0-0.jpg" alt="Album Artwork">
-            <div id="track-badge" class="curation-pill">AUTOPLAY</div>
-          </div>
 
-          <div class="track-meta">
-            <h2 id="track-title" class="track-title">Waiting for playback...</h2>
-            <div id="track-artist" class="track-artist">Autonomous Music Engine</div>
-            <div id="track-reason" class="curation-reason"></div>
-          </div>
+      <!-- Browser Audio Monitor -->
+      <button class="audio-monitor-btn" id="btnBrowserAudio" onclick="toggleBrowserAudio()">
+        <span>🎧</span> <span id="browserAudioLabel">Listen Live in Browser</span>
+      </button>
+      <audio id="browserAudioElement" src="/stream.mp3" preload="none"></audio>
 
-          <div class="progress-section">
-            <div class="progress-bar-bg">
-              <div id="progress-fill" class="progress-bar-fill"></div>
-            </div>
-            <div class="progress-times">
-              <span id="time-elapsed">0:00</span>
-              <span id="time-total">0:00</span>
-            </div>
-          </div>
+      <!-- Volume Row -->
+      <div class="volume-row">
+        <span id="volIcon" style="cursor:pointer;" onclick="toggleMute()">🔊</span>
+        <input type="range" class="volume-slider" id="volSlider" min="0" max="100" value="80" oninput="onVolumeChange(this.value)" />
+        <span id="volPct" style="width:34px; text-align:right;">80%</span>
+      </div>
+    </div>
 
-          <!-- Live Audio Waveform & Visual Drop Cueing Container -->
-          <div id="live-waveform-container" class="waveform-container">
-            <div class="waveform-header">
-              <span class="waveform-label">
-                <span class="waveform-pulse"></span> LIVE WAVEFORM &amp; HARMONIC TRANSITION CUES
-              </span>
-              <span id="waveform-cue-badge" class="waveform-cue">HARMONIC MIX READY</span>
-            </div>
-            <canvas id="waveform-canvas" class="waveform-canvas" width="600" height="60"></canvas>
-            <div class="waveform-footer">
-              <span id="waveform-bpm-tag">BPM: --</span>
-              <span id="waveform-key-tag">Key: --</span>
-              <span id="waveform-drop-tag">Drop / Cue: --</span>
-            </div>
-          </div>
+    <!-- Right Deck: Tabbed Studio Deck -->
+    <div class="card hub-deck">
+      <div class="tabs-header">
+        <button class="tab-btn active" id="tabBtnQueue" onclick="switchHubTab('queue')">
+          <span>📑 Queue</span> <span class="tab-badge" id="queueBadge">0</span>
+        </button>
+        <button class="tab-btn" id="tabBtnHistory" onclick="switchHubTab('history')">
+          <span>🕒 History</span>
+        </button>
+        <button class="tab-btn" id="tabBtnListeners" onclick="switchHubTab('listeners')">
+          <span>🎙️ Listeners</span> <span class="tab-badge" id="listenersBadge">0</span>
+        </button>
+        <button class="tab-btn" id="tabBtnSettings" onclick="switchHubTab('settings')">
+          <span>⚙️ Settings</span>
+        </button>
+      </div>
 
-          <div class="controls-row">
-            <button class="btn btn-icon" onclick="triggerAction('like')" title="Like Track">❤️</button>
-            <button id="btn-pause" class="btn btn-icon btn-primary" onclick="togglePlayPause()" title="Play / Pause">⏸️</button>
-            <button class="btn btn-icon" onclick="triggerAction('skip')" title="Skip Track">⏭️</button>
-            <button class="btn btn-icon" onclick="triggerAction('dislike')" title="Dislike Track">💔</button>
-            <button class="btn btn-icon btn-danger" onclick="vetoCurrentlyPlaying()" title="Veto Artist & Skip">🚫</button>
-          </div>
-
-          <!-- VLC Broadcast Relay -->
-          <div class="radio-banner">
-            <div class="radio-info">
-              <span class="radio-icon">📡</span>
-              <div>
-                <div style="font-weight: 700; font-size: 13px;">VLC / External Broadcast Stream</div>
-                <div style="font-size: 11px; color: var(--text-muted);">Continuous 192k MP3 relay with zero-disconnect silence keep-alive</div>
-              </div>
-            </div>
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <audio id="browser-audio" src="/stream.mp3" preload="none"></audio>
-              <button id="btn-listen" class="btn" style="font-size: 12px; padding: 8px 12px;" onclick="toggleBrowserAudio()">▶ Listen in Browser</button>
-              <button class="btn" style="font-size: 12px; padding: 8px 12px;" onclick="copyStreamUrl()">📋 Copy Stream</button>
-            </div>
+      <!-- Queue Tab -->
+      <div class="tab-panel active" id="panelQueue">
+        <div class="panel-top-bar">
+          <span id="queueSummaryText">0 songs in queue</span>
+          <div style="display:flex; gap:6px;">
+            <button class="btn-action-small" onclick="sendPlayerAction('shuffle')">🔀 Shuffle</button>
+            <button class="btn-action-small danger" onclick="clearQueue()">🗑 Clear Queue</button>
           </div>
         </div>
 
-        <!-- Right Column: Queue, History & Listeners Tabbed Box -->
-        <div class="sidebar-col">
-          <div class="card" style="display: flex; flex-direction: column; min-height: 540px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px; gap: 8px; flex-wrap: wrap;">
-              <div style="display: flex; gap: 6px;">
-                <button id="side-tab-queue" class="brain-tab-btn active" onclick="switchSideTab('queue')" style="padding: 6px 14px; font-size: 12px;">
-                  📑 Queue (<span id="side-queue-count">0</span>)
-                </button>
-                <button id="side-tab-history" class="brain-tab-btn" onclick="switchSideTab('history')" style="padding: 6px 14px; font-size: 12px;">
-                  🕒 History
-                </button>
-                <button id="side-tab-listeners" class="brain-tab-btn" onclick="switchSideTab('listeners')" style="padding: 6px 14px; font-size: 12px;">
-                  🎙️ Listeners (<span id="side-listener-count">0</span>)
-                </button>
-              </div>
-            </div>
+        <div class="up-next-card" id="upNextCard" style="display:none;">
+          <div style="display:flex; align-items:center; gap:8px; min-width:0;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#22c55e; flex-shrink:0;"></span>
+            <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+              <strong style="color:#4ade80;">Up Next:</strong> <span id="upNextTitle" style="color:var(--text);"></span>
+            </span>
+          </div>
+          <span style="font-size:0.68rem; color:var(--text-subtle); flex-shrink:0;">⚡ HARMONIC CUE</span>
+        </div>
 
-            <!-- Queue Panel -->
-            <div id="side-panel-queue" style="display: block; flex: 1; overflow-y: auto;">
-              <div id="queue-box" class="queue-list">
-                <div style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 20px;">Queue is empty</div>
-              </div>
-            </div>
+        <div class="track-list" id="queueListContainer">
+          <!-- Populated by JS -->
+        </div>
+      </div>
 
-            <!-- History Panel -->
-            <div id="side-panel-history" style="display: none; flex: 1; overflow-y: auto;">
-              <div id="history-box" class="settings-list">
-                <div style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 20px;">No recently played tracks yet</div>
-              </div>
-            </div>
+      <!-- History Tab -->
+      <div class="tab-panel" id="panelHistory">
+        <div class="panel-top-bar">
+          <span>Recently Played Tracks</span>
+          <button class="btn-action-small" onclick="fetchStationData()">🔄 Refresh</button>
+        </div>
+        <div class="track-list" id="historyListContainer">
+          <!-- Populated by JS -->
+        </div>
+      </div>
 
-            <!-- Listeners Panel -->
-            <div id="side-panel-listeners" style="display: none; flex: 1; overflow-y: auto;">
-              <div id="listeners-box" class="listeners-list">
-                <span style="color: var(--text-subtle); font-size: 13px;">No active Discord listeners</span>
-              </div>
+      <!-- Listeners Tab -->
+      <div class="tab-panel" id="panelListeners">
+        <div class="panel-top-bar">
+          <span>Active Listeners (Discord &amp; Web)</span>
+        </div>
+        <div class="track-list" id="listenersListContainer">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Settings Tab -->
+      <div class="tab-panel" id="panelSettings">
+        <div class="settings-grid">
+          <div class="settings-card">
+            <div class="settings-card-title">🤖 Autonomous Harmonic DJ Engine</div>
+            <div class="settings-row">
+              <span>Automatic Continuity Chaining:</span>
+              <strong style="color:#4ade80;">Active (Continuous Musical Peers)</strong>
+            </div>
+            <div class="settings-row">
+              <span>Anti-Junk Shield:</span>
+              <span style="color:var(--text-muted);">Blocking meme/sped-up edits &amp; type beats</span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-title">📻 Live Broadcast Relay</div>
+            <div class="settings-row">
+              <span>Stream URL:</span>
+              <code style="color:#c77dff; font-size:0.75rem;">/stream.mp3</code>
+            </div>
+            <div class="settings-row">
+              <span>Bitrate:</span>
+              <span>192 kbps Constant Stereo MP3</span>
+            </div>
+          </div>
+
+          <div class="settings-card">
+            <div class="settings-card-title">🔐 Administration</div>
+            <div class="settings-row">
+              <span>Access Level:</span>
+              <span id="adminStatusDisplay">Guest (Free to Queue Songs)</span>
+            </div>
+            <div style="margin-top:6px;">
+              <button class="btn-action-small" id="settingsAuthActionBtn" onclick="openAuthModal()">Admin Login</button>
             </div>
           </div>
         </div>
       </div>
     </div>
-      </div>
+  </main>
 
-      </div>
-    </div>
-
-    <!-- ========================================================
-         LEVEL 3: BRAIN LOGS & OBSERVABILITY CENTER
-         ======================================================== -->
-    <div id="view-level-4" style="display: none; animation: fadeIn 0.3s ease;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-        <div>
-          <h2 style="font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-            ⚙️ Station Settings &amp; Audio Controls
-          </h2>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-            Fine-tune repeat cooldowns, audio crossfades, content filters, and station curation behavior in real time.
-          </p>
-        </div>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <button class="btn btn-primary" onclick="loadSettingsSubsystems();" style="padding: 8px 16px; font-size: 13px;">
-            🔄 Reload Settings
-          </button>
-          <button class="btn" onclick="resetAllConfigSettings()" style="padding: 8px 14px; font-size: 13px; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
-            ↺ Reset All Defaults
-          </button>
-          <button class="btn" onclick="triggerServerRestart()" style="padding: 8px 14px; font-size: 13px; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1); color: #fbbf24; font-weight: 600;">
-            ⚡ Restart Server
-          </button>
-        </div>
-      </div>
-
-      <!-- Dynamic Runtime Settings Console (Sliders, Toggles, Steppers, Radios) -->
-      <div id="dynamic-settings-container" class="config-settings-grid">
-        <!-- Dynamically rendered by renderConfigSettings() -->
-      </div>
-
-      <!-- Subsystem Quick Controls Grid -->
-      <div class="settings-grid">
-        <!-- Radio Stations Preset -->
-        <div class="settings-card">
-          <div class="settings-card-header">
-            <span class="settings-card-title">📻 Curated Radio Stations</span>
-            <span id="settings-active-station-badge" class="badge-tag">OFF</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Activate instant thematic curation presets. When enabled, autoplay prioritizes tracks fitting the station vibe.
-          </p>
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;" id="radio-station-buttons">
-            <button class="btn" style="font-size: 12px; padding: 6px 12px;" onclick="setRadioStation(null)">
-              ⏹️ Disable Radio Preset (Freeform Autoplay)
-            </button>
-          </div>
-        </div>
-
-        <!-- Time Capsule / Throwback Mode -->
-        <div class="settings-card">
-          <div class="settings-card-header">
-            <span class="settings-card-title">⏳ Time Capsule / Throwback</span>
-            <span id="settings-time-capsule-badge" class="badge-tag">OFF</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Lock the autoplay engine to a specific year or decade (e.g. 1984, 1999, 2010).
-          </p>
-          <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <input id="input-throwback-year" type="number" class="input-field" placeholder="e.g. 1985" min="1950" max="2026" style="margin-bottom: 0;">
-            <button class="btn btn-primary" onclick="setThrowbackYearFromInput()" style="white-space: nowrap;">Lock Year</button>
-            <button class="btn" onclick="clearThrowbackYear()" style="white-space: nowrap;">Reset</button>
-          </div>
-          <div class="suggestion-chips" style="margin-top: 10px;">
-            <button class="chip" onclick="setThrowbackPreset(1984)">1984 🌆</button>
-            <button class="chip" onclick="setThrowbackPreset(1994)">1994 🎸</button>
-            <button class="chip" onclick="setThrowbackPreset(2001)">2001 💿</button>
-            <button class="chip" onclick="setThrowbackPreset(2010)">2010 ⚡</button>
-          </div>
-        </div>
-
-        <!-- Latent Vibe Steering -->
-        <div class="settings-card">
-          <div class="settings-card-header">
-            <span class="settings-card-title">✨ Autonomous Vibe Steering</span>
-            <span id="settings-steering-badge" class="badge-tag">NONE</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Steer real-time autoplay curation towards a specific aesthetic, genre, or mood.
-          </p>
-          <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <input id="input-steering-prompt" type="text" class="input-field" placeholder="e.g. 'late night cyberpunk synth drive'" style="margin-bottom: 0;">
-            <button class="btn btn-primary" onclick="submitSteeringFromInput()" style="white-space: nowrap;">Steer Vibe</button>
-            <button class="btn" onclick="clearSteeringPrompt()" style="white-space: nowrap;">Clear</button>
-          </div>
-        </div>
-
-        <!-- Server Daemon Lifecycle Control Card -->
-        <!-- Vetoed Artists & Songs (Blacklist) -->
-        <div class="settings-card" id="card-veto-manager">
-          <div class="settings-card-header">
-            <span class="settings-card-title">🚫 Vetoed Artists &amp; Songs (Blacklist)</span>
-            <span id="settings-veto-count-badge" class="badge-tag">0 VETOED</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Hard blocklist. Vetoed artists and songs are permanently prevented from autonomous curation.
-          </p>
-          <div style="display: flex; gap: 8px; margin-top: 12px;">
-            <select id="select-veto-type" class="input-field" style="max-width: 110px; margin-bottom: 0;">
-              <option value="artist">Artist</option>
-              <option value="song">Song</option>
-            </select>
-            <input id="input-veto-name" type="text" class="input-field" placeholder="Artist or song name..." style="margin-bottom: 0;">
-            <button class="btn btn-danger" style="white-space: nowrap;" onclick="addVetoFromInput()">Add Veto</button>
-          </div>
-          <div id="settings-vetoes-list" class="settings-list" style="margin-top: 14px; max-height: 220px; overflow-y: auto;">
-            <span style="color: var(--text-muted); font-size: 12px;">No active vetoes</span>
-          </div>
-        </div>
-
-        <div class="settings-card" style="border-color: rgba(245, 158, 11, 0.3);">
-          <div class="settings-card-header">
-            <span class="settings-card-title">⚡ Server Lifecycle &amp; Daemon</span>
-            <span class="badge-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399;">DAEMON ACTIVE</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Gracefully restart the OWRadio engine, reload all audio pipelines, and purge memory buffers without SSH.
-          </p>
-          <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-            <button class="btn" style="border-color: rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.15); color: #fbbf24; font-weight: 600;" onclick="triggerServerRestart()">
-              ⚡ Restart OWRadio Daemon
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal for Adding Song or Vibe -->
-  <div id="add-modal" class="modal-overlay">
+  <!-- Admin Login Modal -->
+  <div class="modal-overlay" id="authModal" onclick="if(event.target===this) closeAuthModal()">
     <div class="modal-box">
-      <div class="tab-group">
-        <button id="tab-song" class="tab-btn active" onclick="switchTab('song')">Single Track / URL</button>
-        <button id="tab-vibe" class="tab-btn" onclick="switchTab('vibe')">AI Vibe Generator</button>
-      </div>
-
-      <div id="content-song">
-        <input id="input-query" class="input-field" type="text" placeholder="Song title, artist, or YouTube/Spotify URL...">
-      </div>
-
-      <div id="content-vibe" style="display: none;">
-        <input id="input-vibe" class="input-field" type="text" placeholder="Describe the vibe (e.g. 'late night cyberpunk synth drive')...">
-      </div>
-
-      <div style="display: flex; justify-content: flex-end; gap: 10px;">
-        <button class="btn" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="submitAdd()">Enqueue</button>
+      <div class="modal-title">🔐 Admin Authentication</div>
+      <p style="font-size:0.78rem; color:var(--text-muted);">Enter the station admin password to unlock full playback control (skip, pause, volume, stop).</p>
+      <input type="password" id="adminPasswordInput" class="modal-input" placeholder="Admin password..." onkeydown="if(event.key==='Enter') submitAdminLogin()" />
+      <div id="authErrorMsg" style="display:none; color:var(--danger); font-size:0.75rem;"></div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn-action-small" onclick="closeAuthModal()">Cancel</button>
+        <button class="btn-fast-play" onclick="submitAdminLogin()">Sign In</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal for Admin Authentication -->
-  <div id="auth-modal" class="modal-overlay" style="display: none;">
-    <div class="modal-box" style="max-width: 440px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h3 style="margin: 0; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-          <span id="auth-modal-icon">🔐</span> <span id="auth-modal-title">Admin Authentication</span>
-        </h3>
-        <button class="btn" style="padding: 4px 10px; font-size: 13px;" onclick="closeAuthModal()">✕</button>
-      </div>
-
-      <p style="font-size: 13px; color: var(--text-subtle); margin-bottom: 20px; line-height: 1.5;">
-        Song search and <strong>+ Queue</strong> are open to all guests. Skip, pause, stop, volume, and configuration settings require admin access.
-      </p>
-
-      <form id="admin-login-form" onsubmit="submitAdminPassword(event)">
-        <div style="margin-bottom: 16px;">
-          <label style="display: block; font-size: 12px; font-weight: 600; color: var(--text-subtle); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">Admin Password</label>
-          <input type="password" id="admin-password-input" class="search-input" placeholder="Enter admin password from .env" style="width: 100%; box-sizing: border-box;" autocomplete="current-password" />
-        </div>
-        <div id="auth-error-msg" style="color: #ef4444; font-size: 12px; margin-bottom: 12px; display: none;"></div>
-        <div style="display: flex; gap: 10px; justify-content: flex-end;">
-          <button type="button" class="btn" onclick="closeAuthModal()">Cancel</button>
-          <button type="submit" id="admin-login-submit-btn" class="btn btn-primary">Unlock Admin</button>
-        </div>
-      </form>
-
-      <div id="supabase-oauth-container" style="display: none; margin-top: 20px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.08); text-align: center;">
-        <div style="font-size: 12px; color: var(--text-subtle); margin-bottom: 12px;">OR SIGN IN WITH GOOGLE</div>
-        <button type="button" class="btn" onclick="loginWithGoogle()" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; background: #ffffff; color: #1e1e1e; font-weight: 600; padding: 9px 16px;">
-          <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
-          Sign in with Google
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Alerts Container -->
-  <div id="toast-container" class="toast-container"></div>
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="/app.js"></script>
 </body>
