@@ -23,14 +23,6 @@ export interface FeatureFlagStatus extends FeatureFlagDefinition {
 
 export const FEATURE_DEFINITIONS: FeatureFlagDefinition[] = [
   {
-    id: 'feature_vibe_latent',
-    name: '/vibe 384-d Latent Steering',
-    description: 'Embed natural language prompts into 384-d latent space via Ollama all-minilm to steer real-time autoplay curation.',
-    category: 'Curation',
-    defaultValue: true,
-    icon: '✨',
-  },
-  {
     id: 'feature_artist_interactive',
     name: '/artist Interactive Discography',
     description: 'Discord interactive select menus displaying artist albums with timeout fallback to pick a song automatically if no choice is made.',
@@ -69,23 +61,6 @@ export const FEATURE_DEFINITIONS: FeatureFlagDefinition[] = [
     category: 'Audio & Mixing',
     defaultValue: true,
     icon: '🎚️',
-  },
-  {
-    id: 'feature_offline_vault',
-    name: 'Instant Offline Cache (Server Vault)',
-    description: 'Local pre-cached audio vault for frequent tracks delivering zero-latency 0.0s playback without yt-dlp latency.',
-    category: 'Audio & Mixing',
-    defaultValue: true,
-    icon: '💾',
-  },
-
-  {
-    id: 'feature_taste_radar_chart',
-    name: 'Collective Taste Fingerprint Radar Chart',
-    description: 'Visual multi-axis spider/radar chart of room taste DNA in Web UI and /taste command.',
-    category: 'WebUI',
-    defaultValue: true,
-    icon: '🕸️',
   },
   {
     id: 'feature_time_capsule',

@@ -49,18 +49,7 @@ echo "🎥 [3/6] Installing latest yt-dlp binary..."
 $SUDO curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp
 $SUDO chmod a+rx /usr/local/bin/yt-dlp
 
-# 4. Install Ollama and pull local AI models (ARM64 optimized)
-echo "🧠 [4/6] Installing local Ollama engine for AI curation..."
-if ! command -v ollama >/dev/null 2>&1; then
-  fi
-
-# Ensure Ollama service is running
-$SUDO systemctl enable --now ollama || true
-sleep 3
-
-echo "📥 Pulling AI models into local Ollama..."
-
-# 5. Open Host Firewall for Ports 8091, 80, 443 (OWRadio Web, Stream & Caddy HTTPS)
+# 4. Open Host Firewall for Ports 8091, 80, 443 (OWRadio Web, Stream & Caddy HTTPS)
 echo "🛡️ [5/6] Opening Host Firewall ports (22, 80, 443, 8091)..."
 if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
   $SUDO ufw allow 8091/tcp comment "OWRadio HTTP & Stream"

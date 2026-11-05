@@ -151,21 +151,6 @@ function initSchema(): void {
       updated_at INTEGER NOT NULL
     );
 
-    -- AI brain & LLM interaction logs
-    CREATE TABLE IF NOT EXISTS brain_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      timestamp INTEGER NOT NULL,
-      model TEXT NOT NULL,
-      action TEXT NOT NULL,
-      prompt TEXT NOT NULL,
-      response TEXT,
-      duration_ms INTEGER NOT NULL,
-      status TEXT NOT NULL,
-      metadata_json TEXT
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_brain_logs_timestamp ON brain_logs(timestamp);
-
     -- Permanently vetoed / blacklisted artists and songs
     CREATE TABLE IF NOT EXISTS vetoed_catalog (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -184,16 +169,7 @@ function initSchema(): void {
       updated_at INTEGER NOT NULL
     );
 
-    -- Track language classifications for foreign language anti-repetition cooldowns
-    CREATE TABLE IF NOT EXISTS track_languages (
-      dedupe_key TEXT PRIMARY KEY,
-      language TEXT NOT NULL,
-      confidence REAL NOT NULL DEFAULT 1.0,
-      source TEXT NOT NULL,
-      detected_at INTEGER NOT NULL
-    );
-    CREATE INDEX IF NOT EXISTS idx_track_languages_lang ON track_languages(language);
-  `);
+    `);
 
   // Non-destructive migrations for existing tables
   try {
