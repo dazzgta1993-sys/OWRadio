@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OWRadio — 100% Real Studio Audio Engine</title>
+  <title>OWRadio Studio — 100% Real Multi-Cloud Audio Engine</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -11,8 +11,8 @@
     <div class="brand">
       <div class="brand-icon">⚡</div>
       <div>
-        <div class="brand-title">OWRadio</div>
-        <div class="brand-sub">STUDIO MULTI-CLOUD AUDIO ENGINE</div>
+        <div class="brand-title">OWRadio Studio</div>
+        <div class="brand-sub">100% REAL MULTI-CLOUD AUDIO ENGINE</div>
       </div>
     </div>
 
@@ -22,17 +22,24 @@
         <input
           id="searchInput"
           type="text"
-          placeholder="Search studio track, artist, album, or paste Spotify / YouTube link..."
+          placeholder="Search track, artist, album, or paste Spotify / YouTube / Deezer URL..."
           autocomplete="off"
         />
-        <button id="playQueryBtn" class="btn btn-primary">▶ Play Now</button>
+        <select id="searchSourceSelect" class="source-select" title="Catalog Source">
+          <option value="auto" selected>🌐 Multi-Engine Auto</option>
+          <option value="ytmusic">🔴 YouTube Music (WEB_REMIX)</option>
+          <option value="deezer">🟣 Deezer Studio</option>
+          <option value="apple">🍎 Apple Music</option>
+          <option value="youtube">▶️ YouTube Live &amp; Video</option>
+        </select>
+        <button id="playQueryBtn" class="btn btn-primary">▶ Play</button>
         <button id="queueQueryBtn" class="btn btn-secondary">+ Queue</button>
       </div>
       <div id="searchResultsDropdown" class="search-dropdown hidden"></div>
     </div>
 
     <div class="status-pills">
-      <span id="broadcastPill" class="pill pill-live">● LIVE 192K</span>
+      <span id="broadcastPill" class="pill pill-live">● LIVE 192K MP3</span>
       <span id="anchorPill" class="pill pill-anchor">⚓ Anchor: Ready</span>
     </div>
   </header>
@@ -41,7 +48,7 @@
     <!-- Left Column: Deck 1 Now Playing & Live Stream Player -->
     <section class="card player-card">
       <div class="card-header-mini">
-        <span id="deck1Status">🔊 Deck 1 — Studio Broadcast</span>
+        <span id="deck1Status">🔊 Deck 1 — Studio Master</span>
         <span id="sourceBadge" class="tag-badge">STUDIO</span>
       </div>
 
@@ -55,7 +62,7 @@
 
       <div class="track-meta">
         <h2 id="nowPlayingTitle">Ready to Broadcast</h2>
-        <div id="nowPlayingArtist" class="track-artist">Search any song or pick a chart track</div>
+        <div id="nowPlayingArtist" class="track-artist" title="Click to explore artist discography">Search a song or pick a chart hit</div>
         <div id="nowPlayingAlbum" class="track-album"></div>
         <div id="vibeReasonBadge" class="vibe-reason">⚓ Multi-Cloud Studio Engine</div>
       </div>
@@ -72,8 +79,10 @@
 
       <div class="transport-controls">
         <button id="stopBtn" class="icon-btn" title="Stop & Clear">⏹</button>
+        <button id="shuffleBtn" class="icon-btn" title="Shuffle Queue">🔀</button>
         <button id="playPauseBtn" class="play-main-btn" title="Play / Pause">▶</button>
         <button id="skipBtn" class="icon-btn" title="Skip to Deck 2">⏭</button>
+        <button id="loopBtn" class="icon-btn" title="Loop Mode: Off">🔁</button>
       </div>
 
       <div class="vote-controls">
@@ -91,68 +100,116 @@
       </div>
     </section>
 
-    <!-- Right Column: Triple-Deck Queue, History, Official Charts, and Vibe Engine Controls -->
+    <!-- Right Column: Studio Command Center -->
     <section class="card main-panel">
       <div class="tabs-bar">
         <div class="tabs-left">
           <button class="tab-btn active" data-tab="queue">Queue &amp; Decks <span id="queueCount" class="count-pill">0</span></button>
-          <button class="tab-btn" data-tab="charts">Official Charts (UK/US)</button>
-          <button class="tab-btn" data-tab="history">History</button>
-          <button class="tab-btn" data-tab="vibe">Vibe Engine 🎛️</button>
+          <button class="tab-btn" data-tab="charts">📊 Official Charts</button>
+          <button class="tab-btn" data-tab="discography">💿 Discography</button>
+          <button class="tab-btn" data-tab="history">🕒 History</button>
+          <button class="tab-btn" data-tab="vibe">🧠 Vibe &amp; Brain Hub</button>
         </div>
         <div class="tabs-right">
-          <button id="clearQueueBtn" class="btn btn-small">Clear Queue</button>
+          <button id="clearQueueBtn" class="btn btn-small">🗑️ Clear Queue</button>
         </div>
       </div>
 
+      <!-- Triple-Deck Standby Bar -->
       <div id="deck2Banner" class="deck-banner hidden">
-        <span class="deck-dot"></span>
-        <span id="deck2Text">Deck 2 Ready: —</span>
-        <span id="deck2PrewarmTag" class="deck-tag">PRE-WARMED</span>
+        <span id="deck2Text">⚡ Deck 2 Standby: —</span>
+        <span id="deck2PrewarmTag" class="deck-tag">STREAM READY</span>
       </div>
 
-      <!-- Tab: Queue -->
-      <div id="tab-queue" class="tab-pane active">
+      <!-- Tab 1: Queue -->
+      <div id="tab-queue" class="tab-pane">
         <div id="queueList" class="track-list"></div>
       </div>
 
-      <!-- Tab: Official UK/US Charts -->
+      <!-- Tab 2: Official UK / US / Global Charts -->
       <div id="tab-charts" class="tab-pane hidden">
         <div class="chart-toolbar">
           <button class="btn btn-small chart-country-btn active" data-country="gb">🇬🇧 UK Official Top 40</button>
-          <button class="btn btn-small chart-country-btn" data-country="us">🇺🇸 US Hot 40</button>
+          <button class="btn btn-small chart-country-btn" data-country="us">🇺🇸 US Billboard Hot 40</button>
+          <button class="btn btn-small chart-country-btn" data-country="global">🌍 Deezer Global Top 40</button>
         </div>
         <div id="chartsList" class="track-list"></div>
       </div>
 
-      <!-- Tab: History -->
+      <!-- Tab 3: Artist Discography & Studio Album Explorer (MusicBrainz + Deezer) -->
+      <div id="tab-discography" class="tab-pane hidden">
+        <div class="disco-toolbar">
+          <input
+            id="discoArtistInput"
+            type="text"
+            class="disco-input"
+            placeholder="Enter artist name (e.g. Calvin Harris, Daft Punk, Oasis, Akon)..."
+          />
+          <select id="discoCategorySelect" class="source-select">
+            <option value="All" selected>All Releases</option>
+            <option value="Studio Albums">💿 Studio Albums Only</option>
+            <option value="Singles">📀 Singles</option>
+            <option value="EPs">⚡ EPs</option>
+            <option value="Compilations">📦 Compilations</option>
+            <option value="Live Albums">🎸 Live Albums</option>
+          </select>
+          <button id="discoSearchBtn" class="btn btn-primary">Explore Catalog</button>
+        </div>
+        <div id="discoList" class="disco-grid"></div>
+      </div>
+
+      <!-- Tab 4: History -->
       <div id="tab-history" class="tab-pane hidden">
         <div id="historyList" class="track-list"></div>
       </div>
 
-      <!-- Tab: Vibe Engine Settings -->
+      <!-- Tab 5: Vibe Engine & Autoplay Telemetry Hub -->
       <div id="tab-vibe" class="tab-pane hidden">
+        <div class="telemetry-grid">
+          <div class="telemetry-box">
+            <div class="telemetry-lbl">VIBE ANCHOR</div>
+            <div id="telAnchor" class="telemetry-val">Auto Anchor</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-lbl">AUTOPLAY CHAIN</div>
+            <div id="telChain" class="telemetry-val">0 tracks</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-lbl">DECK 2 STANDBY</div>
+            <div id="telDeck2" class="telemetry-val">Standby</div>
+          </div>
+          <div class="telemetry-box">
+            <div class="telemetry-lbl">DECK 3 PIPELINE</div>
+            <div id="telDeck3" class="telemetry-val">Standby</div>
+          </div>
+          <div class="telemetry-box telemetry-wide">
+            <div class="telemetry-lbl">LAST ENGINE DECISION</div>
+            <div id="telDecision" class="telemetry-val">Ready</div>
+          </div>
+        </div>
+
         <div class="vibe-settings-grid">
           <div class="setting-box">
-            <h3>Vibe Progression Mode</h3>
-            <p class="setting-desc">Controls how Autoplay transitions from your Anchor Artist.</p>
+            <h3>🎯 Vibe Discovery Matrix</h3>
+            <p class="setting-desc">How Autoplay progresses from your Anchor Artist.</p>
             <div class="radio-group" id="vibeModeGroup">
-              <button class="choice-btn active" data-mode="balanced">⚓ Balanced (Anchor + Related)</button>
-              <button class="choice-btn" data-mode="deep_dive">🎯 Deep Dive (Same Artist Catalog)</button>
-              <button class="choice-btn" data-mode="collabs">🤝 Collabs &amp; Immediate Circle</button>
-              <button class="choice-btn" data-mode="discovery">🚀 Wild Discovery</button>
+              <button class="choice-btn active" data-mode="balanced">⚓ Smart Vibe (Anchor + Related Circle)</button>
+              <button class="choice-btn" data-mode="deep_dive">🎯 Artist Deep Dive (100% Same Artist Catalog)</button>
+              <button class="choice-btn" data-mode="collabs">🤝 Collabs &amp; Immediate Producer Circle</button>
+              <button class="choice-btn" data-mode="discovery">🌌 Wild Discovery (Continuous Exploration)</button>
             </div>
           </div>
 
           <div class="setting-box">
-            <h3>Catalog &amp; Radio Source</h3>
-            <p class="setting-desc">100% real music databases — zero fake hashes.</p>
+            <h3>🎛️ Recommendation Platform Source</h3>
+            <p class="setting-desc">100% live music databases — zero fake hashes.</p>
             <div class="radio-group" id="vibeEngineGroup">
-              <button class="choice-btn active" data-engine="auto">⚡ Auto Multi-Cloud (Deezer + YTMusic + Apple)</button>
-              <button class="choice-btn" data-engine="deezer">📻 Deezer Artist Radio &amp; Related (3k+ Fans)</button>
-              <button class="choice-btn" data-engine="ytmusic">🎵 YouTube Music Studio Radio (WEB_REMIX)</button>
+              <button class="choice-btn active" data-engine="auto">🌐 Multi-Cloud Auto (Deezer + YTMusic + Apple)</button>
+              <button class="choice-btn" data-engine="deezer">🟣 Deezer Artist Radio &amp; Related (3,000+ Fans)</button>
+              <button class="choice-btn" data-engine="ytmusic">🔴 YouTube Music Studio Radio (WEB_REMIX)</button>
               <button class="choice-btn" data-engine="musicbrainz">🏛️ MusicBrainz Canonical Studio Albums</button>
-              <button class="choice-btn" data-engine="charts">🔥 Official UK/US Top 40 Rotation</button>
+              <button class="choice-btn" data-engine="apple">🍎 Apple Music Catalog Discovery</button>
+              <button class="choice-btn" data-engine="charts">📊 Official UK/US Top 40 Rotation</button>
             </div>
           </div>
         </div>
@@ -161,5 +218,6 @@
   </main>
 
   <script src="/app.js"></script>
+  <script src="/catalog.js"></script>
 </body>
 </html>
