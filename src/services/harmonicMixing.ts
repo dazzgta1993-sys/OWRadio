@@ -4,7 +4,6 @@
  * Uses Camelot Wheel key compatibility and BPM delta to calculate smooth DJ blends.
  */
 
-import featureFlags from './featureFlags.js';
 
 export interface HarmonicProfile {
   bpm: number;
@@ -86,17 +85,7 @@ class HarmonicMixingService {
     trackA: { title: string; artist: string; bpm?: number; key?: string },
     trackB: { title: string; artist: string; bpm?: number; key?: string }
   ): MixingAnalysis {
-    if (!featureFlags.isEnabled('feature_harmonic_crossfade')) {
-      return {
-        isHarmonicMatch: false,
-        bpmDeltaPct: 0,
-        recommendedCrossfadeSec: 1.0,
-        crossfadeFrames: 50, // default 1.0s (50 * 20ms)
-        reason: 'Harmonic mixing disabled (standard 1.0s cut)',
-      };
-    }
-
-    const profileA = this.analyzeTrack(trackA.title, trackA.artist, trackA.bpm, trackA.key);
+        const profileA = this.analyzeTrack(trackA.title, trackA.artist, trackA.bpm, trackA.key);
     const profileB = this.analyzeTrack(trackB.title, trackB.artist, trackB.bpm, trackB.key);
 
     const keyCompat = this.isKeyCompatible(profileA.key, profileB.key);

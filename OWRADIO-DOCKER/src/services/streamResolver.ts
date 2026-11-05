@@ -12,7 +12,6 @@ import { sqlite } from '../db/index.js';
 import config from '../config.js';
 import deezerService, { type DeezerTrackMetadata } from './deezer.js';
 import youtubeService from './youtube.js';
-import featureFlags from './featureFlags.js';
 import dynamicSettings from './dynamicSettings.js';
 
 const execFileAsync = promisify(execFile);

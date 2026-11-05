@@ -23,8 +23,6 @@ import {
 import type { GuildPlayer, PlayerStatePayload } from '../player/GuildPlayer.js';
 import config from '../config.js';
 import { getBotState, setBotState, sqlite } from '../db/index.js';
-import featureFlags from '../services/featureFlags.js';
-import stationCurator from '../services/stationCurator.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 
 function formatDuration(sec: number): string {
@@ -437,13 +435,7 @@ export class PlayerUiService {
 
     // Dynamic theme color
     let themeColor = 0x6366f1; // Indigo / Studio Violet
-    if (state.radioStation) {
-      themeColor = 0x38bdf8; // Sky Blue
-    } else if (state.timeCapsuleYear) {
-      themeColor = 0xf59e0b; // Gold
-    } else if (state.morph?.active) {
-      themeColor = 0xec4899; // Magenta
-    } else if (track.curatedBy === 'AI Vibe Mix') {
+    if (track.curatedBy === 'DJ Harmonic Chain') {
       themeColor = 0xa855f7; // Purple
     } else if (track.curatedBy === 'User Request' || track.isManualRequest) {
       themeColor = track.requestType === 'playlist' ? 0x3b82f6 : 0x10b981;

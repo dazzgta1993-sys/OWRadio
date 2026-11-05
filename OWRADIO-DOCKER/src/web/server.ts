@@ -1,3 +1,4 @@
+import collaborativeGraph from '../services/collaborativeGraph.js';
 /**
  * @file server.ts
  * @description Embedded Hono HTTP server running on port 8091 with CORS enabled.
@@ -21,13 +22,9 @@ import { AudioTrack } from '../player/AudioTrack.js';
 import youtube from '../services/youtube.js';
 import deezer from '../services/deezer.js';
 import linkParser from '../services/linkParser.js';
-import vibeService from '../services/vibeService.js';
 import musicbrainz from '../services/musicbrainz.js';
 import curator from '../services/curator.js';
-import tasteRadar from '../services/tasteRadar.js';
 import playlistParser from '../services/playlistParser.js';
-import featureFlags from '../services/featureFlags.js';
-import stationCurator from '../services/stationCurator.js';
 import harmonicMixing from '../services/harmonicMixing.js';
 import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../utils/trackDedupe.js';
 import dynamicSettings from '../services/dynamicSettings.js';
@@ -242,7 +239,9 @@ export function createWebServer(player: GuildPlayer) {
     }
 
     if (mode === 'vibe') {
-      const vibeItems = await vibeService.generateVibePlaylist(query, 5);
+      const related = await collaborativeGraph.getRelatedArtists(query, 5);
+      const artistsToQuery = related.length > 0 ? related.map((r: any) => r.name) : [query];
+      const vibeItems = await collaborativeGraph.getDeepCutsForArtists(artistsToQuery, 5, 2);
 
       const queuedSongIds = new Set<string>();
       const queuedArtists = new Set<string>();
@@ -298,7 +297,7 @@ export function createWebServer(player: GuildPlayer) {
               queuedLanguages
             )
           ) {
-            const track = AudioTrack.fromYouTube(ytCandidate, 'web_dashboard', true, 'AI Vibe Mix', item.reason);
+            const track = AudioTrack.fromYouTube(ytCandidate, 'web_dashboard', true, 'AI Vibe Mix', (item as any).reason || 'Vibe match');
             await player.enqueue(track);
             queuedSongIds.add(ytCandidate.id);
             queuedArtists.add(ytCandidate.artist.toLowerCase());
@@ -332,7 +331,7 @@ export function createWebServer(player: GuildPlayer) {
               queuedLanguages
             )
           ) {
-            const track = AudioTrack.fromDeezer(meta, 'web_dashboard', true, 'AI Vibe Mix', item.reason);
+            const track = AudioTrack.fromDeezer(meta, 'web_dashboard', true, 'AI Vibe Mix', (item as any).reason || 'Vibe match');
             await player.enqueue(track);
             queuedSongIds.add(meta.id);
             queuedArtists.add(meta.artist.toLowerCase());
@@ -740,12 +739,7 @@ export function createWebServer(player: GuildPlayer) {
         wasPlaying: getBotState('was_playing') === '1',
         lastTrackTitle: getBotState('last_track_title'),
       },
-      tasteRadar: {
-        target: 50_000,
-        totalSongs: tasteRadar.getCatalogStats().totalSongs,
-        totalEmbeddings: tasteRadar.getCatalogStats().totalEmbeddings,
-        progressPct: ((tasteRadar.getCatalogStats().totalSongs / 50_000) * 100).toFixed(1),
-      },
+
     });
   });
 
@@ -833,252 +827,6 @@ export function createWebServer(player: GuildPlayer) {
     } catch (err) {
       return c.json({ error: (err as Error).message }, 500);
     }
-  });
-
-  // --- 5f. POST /api/brain/radar/scan (Trigger Taste Radar Expansion Cycle) ---
-  app.post('/api/brain/radar/scan', requireAdminAuth, async (c) => {
-    const result = await tasteRadar.runMiningCycle(35);
-    return c.json({ success: true, result });
-  });
-
-  // --- 5g. GET /api/settings (Feature Flags, Dynamic Settings & System State) ---
-  app.get('/api/settings', (c) => {
-    const activeUserIds = player.getActiveListenerUserIds();
-    const flags = featureFlags.getAllFlags();
-    const configSettings = dynamicSettings.getAllSettings();
-    const vaultStats = { totalTracks: 0, totalSizeBytes: 0, formattedSize: "0 MB" };
-    const radioStations = stationCurator.getAllStations();
-    const activeStation = stationCurator.getActiveStation();
-    const timeCapsuleYear = stationCurator.getTimeCapsuleYear();
-    const storyArc = stationCurator.getStoryArcState();
-    const morph = stationCurator.getMorphState();
-    const steering = { prompt: "", active: false };
-    const currentTrackSummary = player.currentTrack ? {
-      id: player.currentTrack.id,
-      title: player.currentTrack.title,
-      artist: player.currentTrack.artist,
-      album: player.currentTrack.album,
-      durationSec: player.currentTrack.durationSec,
-    } : null;
-    const tasteFingerprint = { labels: [], datasets: [] };
-
-    return c.json({
-      flags,
-      configSettings,
-      vaultStats,
-      radioStations,
-      activeStation,
-      timeCapsuleYear,
-      storyArc,
-      morph,
-      steering,
-      tasteFingerprint,
-    });
-  });
-
-  // --- 5g-2. GET /api/settings/config (Dedicated Config Settings List) ---
-  app.get('/api/settings/config', (c) => {
-    return c.json({
-      success: true,
-      settings: dynamicSettings.getAllSettings(),
-    });
-  });
-
-  // --- 5g-3. POST /api/settings/config/update (Update Dynamic Runtime Setting) ---
-  app.post('/api/settings/config/update', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const key = body.key;
-    const value = body.value;
-
-    if (!key || typeof key !== 'string') {
-      return c.json({ error: 'Missing or invalid setting key' }, 400);
-    }
-
-    const res = dynamicSettings.set(key, value);
-    if (!res.success) {
-      return c.json({ error: res.error || 'Failed to update setting' }, 400);
-    }
-
-    return c.json({
-      success: true,
-      key,
-      value: res.value,
-      settings: dynamicSettings.getAllSettings(),
-    });
-  });
-
-  // --- 5g-4. POST /api/settings/config/reset (Reset Dynamic Runtime Setting) ---
-  app.post('/api/settings/config/reset', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const key = body.key;
-
-    if (key && typeof key === 'string') {
-      const res = dynamicSettings.reset(key);
-      return c.json({ success: true, key, value: res.value });
-    } else {
-      dynamicSettings.resetAll();
-      return c.json({ success: true, all: true, settings: dynamicSettings.getAllSettings() });
-    }
-  });
-
-  // --- 5h. POST /api/settings/toggle (Toggle Individual Feature Flag) ---
-  app.post('/api/settings/toggle', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const featureId = body.featureId;
-    if (!featureId || typeof featureId !== 'string') {
-      return c.json({ error: 'Missing or invalid featureId' }, 400);
-    }
-
-    let newState: boolean;
-    if (typeof body.enabled === 'boolean') {
-      featureFlags.setEnabled(featureId, body.enabled);
-      newState = body.enabled;
-    } else {
-      newState = featureFlags.toggle(featureId);
-    }
-
-    return c.json({
-      success: true,
-      featureId,
-      enabled: newState,
-      flags: featureFlags.getAllFlags(),
-    });
-  });
-
-  // --- 5q. POST /api/settings/restart (Graceful Server Daemon Restart) ---
-  app.post('/api/settings/restart', requireAdminAuth, (c) => {
-    console.log('[WebServer] ⚡ Admin requested server daemon restart via WebUI Settings.');
-    setTimeout(() => {
-      console.log('[WebServer] Exiting process for systemd auto-restart...');
-      process.exit(0);
-    }, 600);
-    return c.json({ success: true, message: 'Server daemon restart initiated' });
-  });
-
-  // --- 5i. POST /api/settings/radio (Set Curated Radio Station Preset) ---
-  app.post('/api/settings/radio', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const stationId = body.stationId || null;
-    const station = stationCurator.setStation(stationId);
-    await player.recurateAutoplayBuffer();
-    return c.json({ success: true, activeStation: station });
-  });
-
-  // --- 5j. POST /api/settings/throwback (Set Time Capsule Year) ---
-  app.post('/api/settings/throwback', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const year = typeof body.year === 'number' ? body.year : null;
-    if (year) {
-      await stationCurator.engageTimeCapsule(year);
-    } else {
-      stationCurator.setTimeCapsuleYear(null);
-    }
-    await player.recurateAutoplayBuffer();
-    return c.json({ success: true, timeCapsuleYear: year });
-  });
-
-  // --- 5k. POST /api/settings/morph (Engage DJ Morph Mode) ---
-  app.post('/api/settings/morph', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const targetVibe = body.targetVibe?.trim();
-    if (!targetVibe) {
-      stationCurator.cancelMorph();
-      await player.recurateAutoplayBuffer();
-      return c.json({ success: true, active: false });
-    }
-
-    const vector = null;
-    if (!vector) {
-      return c.json({ error: 'Could not generate embedding for target vibe' }, 400);
-    }
-
-    const morphSteps = body.steps || 4;
-    stationCurator.startMorph(targetVibe, vector, morphSteps);
-    await player.recurateAutoplayBuffer();
-    return c.json({ success: true, morph: stationCurator.getMorphState() });
-  });
-
-  // --- 5l. POST /api/settings/vibe-steering (Engage Latent Vector Steering) ---
-  app.post('/api/settings/vibe-steering', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const prompt = body.prompt?.trim();
-    if (!prompt) {
-      
-      await player.recurateAutoplayBuffer();
-      return c.json({ success: true, active: false });
-    }
-
-    const vector = null;
-    if (!vector) {
-      return c.json({ error: 'Could not generate embedding for prompt' }, 400);
-    }
-
-    
-    await player.recurateAutoplayBuffer();
-    return c.json({ success: true, steering: { prompt: "", active: false } });
-  });
-
-  // --- 5m. GET /api/settings/taste-radar (Room Taste DNA Fingerprint) ---
-  app.get('/api/settings/taste-radar', (c) => {
-    const activeUserIds = player.getActiveListenerUserIds();
-    const currentTrackSummary = player.currentTrack ? {
-      id: player.currentTrack.id,
-      title: player.currentTrack.title,
-      artist: player.currentTrack.artist,
-      album: player.currentTrack.album,
-      durationSec: player.currentTrack.durationSec,
-    } : null;
-    const fingerprint = { labels: [], datasets: [] };
-    return c.json(fingerprint);
-  });
-
-  // --- 5n. POST /api/settings/vault/clear (Clear Server Vault Cache) ---
-  app.post('/api/settings/vault/clear', requireAdminAuth, (c) => {
-    return c.json({ success: true, vaultStats: { totalTracks: 0, totalSizeBytes: 0, formattedSize: '0 MB' } });
-  });
-
-  // --- 5o. GET /api/settings/features (Feature Flags List) ---
-  app.get('/api/settings/features', (c) => {
-    return c.json(featureFlags.getAllFlags());
-  });
-
-  // --- 5p. POST /api/settings/features/toggle (Toggle Feature Flag Alias) ---
-  app.post('/api/settings/features/toggle', requireAdminAuth, async (c) => {
-    const body = await c.req.json().catch(() => ({}));
-    const featureId = body.featureId;
-    if (!featureId || typeof featureId !== 'string') {
-      return c.json({ error: 'Missing or invalid featureId' }, 400);
-    }
-
-    let newState: boolean;
-    if (typeof body.enabled === 'boolean') {
-      featureFlags.setEnabled(featureId, body.enabled);
-      newState = body.enabled;
-    } else {
-      newState = featureFlags.toggle(featureId);
-    }
-
-    return c.json({
-      success: true,
-      featureId,
-      enabled: newState,
-      flags: featureFlags.getAllFlags(),
-    });
-  });
-
-
-  // --- 5q. GET /api/taste/radar (Taste Radar Fingerprint Alias) ---
-  app.get('/api/taste/radar', (c) => {
-    const activeUserIds = player.getActiveListenerUserIds();
-    const currentTrackSummary = player.currentTrack ? {
-      id: player.currentTrack.id,
-      title: player.currentTrack.title,
-      artist: player.currentTrack.artist,
-      album: player.currentTrack.album,
-      durationSec: player.currentTrack.durationSec,
-    } : null;
-    const fingerprint = { labels: [], datasets: [] };
-    return c.json(fingerprint);
   });
 
   // --- 6. GET /api/events (Server-Sent Events) ---

@@ -25,9 +25,7 @@ import { BroadcastTee } from './BroadcastTee.js';
 import PlaylistBlender from './PlaylistBlender.js';
 import streamResolver from '../services/streamResolver.js';
 import curator from '../services/curator.js';
-import featureFlags from '../services/featureFlags.js';
 import harmonicMixing from '../services/harmonicMixing.js';
-import stationCurator from '../services/stationCurator.js';
 import vetoService from '../services/vetoService.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 import { getTrackDedupeKey, isDuplicateTrack, normalizeArtist } from '../utils/trackDedupe.js';
@@ -41,14 +39,7 @@ export interface PlayerStatePayload {
   upNext: { title: string; artist: string; curatedBy: string; requestType?: string } | null;
   roomListeners: string[];
   queueLength: number;
-  storyArc?: ReturnType<typeof stationCurator['getStoryArcState']>;
-  radioStation?: ReturnType<typeof stationCurator['getActiveStation']>;
-  timeCapsuleYear?: number | null;
-  morph?: ReturnType<typeof stationCurator['getMorphState']>;
   audioMeter?: { rms: number; peak: number; bands: number[] };
-  brainPills?: any[];
-  activeBrainCount?: number;
-  totalBrainCount?: number;
 }
 
 export class GuildPlayer extends EventEmitter {
@@ -955,7 +946,7 @@ export class GuildPlayer extends EventEmitter {
         const skipSec = dynamicSettings.getNumber('audio_skip_crossfade_sec', 0.5);
         customFadeFrames = Math.max(0, Math.round(skipSec / 0.02));
         console.log(`[GuildPlayer] ⏭️ User skip: executing ${skipSec}s (${customFadeFrames} frames) crossfade`);
-      } else if (this.currentTrack && featureFlags.isEnabled('feature_harmonic_crossfade')) {
+      } else if (this.currentTrack) {
         const analysis = harmonicMixing.evaluateTransition(this.currentTrack, nextTrack);
         this.lastTransitionAnalysis = analysis;
         customFadeFrames = analysis.crossfadeFrames;
@@ -1458,14 +1449,7 @@ export class GuildPlayer extends EventEmitter {
         : null,
       roomListeners: this.getActiveListenerNames(),
       queueLength: this.queue.length,
-      storyArc: stationCurator.getStoryArcState(),
-      radioStation: stationCurator.getActiveStation(),
-      timeCapsuleYear: stationCurator.getTimeCapsuleYear(),
-      morph: stationCurator.getMorphState(),
       audioMeter: this.broadcastTee.getLiveAudioMeter(),
-      brainPills,
-      activeBrainCount,
-      totalBrainCount: brainPills.length,
     };
   }
 

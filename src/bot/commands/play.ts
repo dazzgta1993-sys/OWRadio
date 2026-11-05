@@ -1,3 +1,4 @@
+import collaborativeGraph from '../../services/collaborativeGraph.js';
 /**
  * @file play.ts
  * @description Streamlined Slash command handlers for /play and /vibe.
@@ -19,9 +20,7 @@ import { AudioTrack } from '../../player/AudioTrack.js';
 import youtube from '../../services/youtube.js';
 import deezer from '../../services/deezer.js';
 import linkParser from '../../services/linkParser.js';
-import vibeService from '../../services/vibeService.js';
 import curator from '../../services/curator.js';
-import featureFlags from '../../services/featureFlags.js';
 import dynamicSettings from '../../services/dynamicSettings.js';
 import { normalizeArtist, getTrackDedupeKey } from '../../utils/trackDedupe.js';
 
@@ -320,17 +319,13 @@ export async function handleVibe(
 
   // 2. If 384-d Latent Steering is enabled, embed prompt and set real-time steering vector
   let isSteeringEngaged = false;
-  if (featureFlags.isEnabled('feature_vibe_latent')) {
-    const vector = null;
-    if (vector) {
-            isSteeringEngaged = true;
-    }
-  }
 
   // 3. Purge stale unplayed autoplay tracks so the new vibe takes effect IMMEDIATELY
   await player.recurateAutoplayBuffer();
 
-  const vibeItems = await vibeService.generateVibePlaylist(prompt, 6);
+  const related = await collaborativeGraph.getRelatedArtists(prompt, 6);
+  const candidateArtists = related.length > 0 ? related.map((r: any) => r.name) : [prompt];
+  const vibeItems = await collaborativeGraph.getDeepCutsForArtists(candidateArtists, 6, 2);
 
   if (vibeItems.length === 0) {
     if (isSteeringEngaged) {
@@ -406,7 +401,7 @@ export async function handleVibe(
           userId,
           true,
           'AI Vibe Mix',
-          item.reason,
+          (item as any).reason || 'Vibe match',
           'playlist',
           `vibe_${prompt.toLowerCase().replace(/\s+/g, '_')}`,
           `Vibe: "${prompt}"`
@@ -449,7 +444,7 @@ export async function handleVibe(
           userId,
           true,
           'AI Vibe Mix',
-          item.reason,
+          (item as any).reason || 'Vibe match',
           'playlist',
           `vibe_${prompt.toLowerCase().replace(/\s+/g, '_')}`,
           `Vibe: "${prompt}"`

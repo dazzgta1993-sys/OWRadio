@@ -19,7 +19,6 @@ import {
 } from 'discord.js';
 import config from '../config.js';
 import { sqlite } from '../db/index.js';
-import featureFlags from '../services/featureFlags.js';
 import deezer from '../services/deezer.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 import type { GuildPlayer } from '../player/GuildPlayer.js';
@@ -67,34 +66,13 @@ import {
   handleLeave,
 } from './commands/controls.js';
 
-import {
-  stationCommand,
-  artistCommand,
-  tasteCommand,
-  throwbackCommand,
-  radioCommand,
-  morphCommand,
-  vetoCommand,
-  handleArtist,
-  handleTaste,
-  handleThrowback,
-  handleRadio,
-  handleMorph,
-  handleVeto,
-} from './commands/features.js';
-import {
-  filterCommand,
-  handleFilterCommand,
-  handleFilterButtonInteraction,
-} from './commands/filter.js';
+
+
 
 // --- Consolidated Slash Commands List (Option C: 7 Master Commands) ---
 const ALL_COMMANDS = [
   playCommand,     // /play <query>
-  vibeCommand,     // /vibe <prompt>
   controlCommand,  // /control <skip|pause|resume|replay|queue|clear|shuffle|remove|volume|status|history|like|dislike>
-  stationCommand,  // /station <preset|throwback|morph|filter|artist>
-  tasteCommand,    // /taste <profile|playlist|artists|genres|clear|veto>
   joinCommand,     // /join
   leaveCommand,    // /leave
 ];
@@ -459,56 +437,20 @@ export async function createDiscordBot(player: GuildPlayer): Promise<Client> {
           }
           break;
         }
-        case 'station': {
-          const sub = interaction.options.getSubcommand();
-          switch (sub) {
-            case 'preset':
-              await handleRadio(interaction, player);
-              break;
-            case 'throwback':
-              await handleThrowback(interaction, player);
-              break;
-            case 'morph':
-              await handleMorph(interaction, player);
-              break;
-            case 'filter':
-              await handleFilterCommand(interaction, player);
-              break;
-            case 'artist':
-              await handleArtist(interaction, player);
-              break;
-            default:
-              await interaction.reply({ content: `⚠️ Unknown station subcommand: ${sub}`, ephemeral: true });
-          }
-          break;
-        }
-        case 'taste':
-          await handleTaste(interaction, player);
-          break;
+        
+        
         case 'join':
           await handleJoin(interaction, player);
           break;
         case 'leave':
           await handleLeave(interaction, player);
           break;
-        case 'artist':
-          await handleArtist(interaction, player);
-          break;
-        case 'taste':
-          await handleTaste(interaction, player);
-          break;
-        case 'throwback':
-          await handleThrowback(interaction, player);
-          break;
-        case 'radio':
-          await handleRadio(interaction, player);
-          break;
-        case 'morph':
-          await handleMorph(interaction, player);
-          break;
-        case 'veto':
-          await handleVeto(interaction, player);
-          break;
+        
+        
+        
+        
+        
+        
         case 'skip':
           await handleSkip(interaction, player);
           break;
@@ -557,9 +499,7 @@ export async function createDiscordBot(player: GuildPlayer): Promise<Client> {
         case 'leave':
           await handleLeave(interaction, player);
           break;
-        case 'filter':
-          await handleFilterCommand(interaction, player);
-          break;
+        
         default:
           console.warn(`[DiscordBot] Unrecognized command: ${interaction.commandName}`);
       }

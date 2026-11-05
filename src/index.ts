@@ -9,7 +9,6 @@ import { sqlite } from './db/index.js';
 import { GuildPlayer } from './player/GuildPlayer.js';
 import { createDiscordBot } from './bot/client.js';
 import { startWebServer } from './web/server.js';
-import tasteRadar from './services/tasteRadar.js';
 import type { Client } from 'discord.js';
 
 console.log('====================================================');
@@ -43,27 +42,24 @@ async function main() {
     console.log(`[Bootstrap] Web Dashboard active at http://0.0.0.0:${config.WEB_PORT}/`);
   }
 
-  // 4. Start Autonomous Taste Radar (Continuous Background Catalog Expansion & Turnover)
-  tasteRadar.setActiveListenersProvider(() => player.getActiveListenerUserIds());
-  tasteRadar.start();
-
   // Graceful shutdown handling
   const shutdown = async (signal: string) => {
     console.log(`\n[Shutdown] Received ${signal}. Gracefully stopping OWRadio...`);
     try {
-      tasteRadar.stop();
       player.stop();
       player.disconnectVoice();
       player.broadcastTee.destroy();
       if (botClient) {
         botClient.destroy();
       }
+      server.close();
       sqlite.close();
-      console.log('[Shutdown] All subsystems terminated cleanly. Exiting.');
+      console.log('[Shutdown] All subsystems safely stopped. Exiting.');
+      process.exit(0);
     } catch (err) {
-      console.error('[Shutdown] Error during shutdown:', err);
+      console.error('[Shutdown] Error during shutdown:', (err as Error).message);
+      process.exit(1);
     }
-    process.exit(0);
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));
@@ -71,6 +67,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[Fatal] Unhandled startup exception:', err);
+  console.error('[Bootstrap] Fatal startup error:', err);
   process.exit(1);
 });
