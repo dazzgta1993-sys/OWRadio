@@ -730,7 +730,7 @@ export function createWebServer(player: GuildPlayer) {
       cooldownConfig: {
         songCooldownHours: config.AUTOPLAY_COOLDOWN_HOURS,
         artistCooldownHours: config.ARTIST_COOLDOWN_HOURS,
-        languageCooldownMinutes: dynamicSettings.getNumber('curation_language_cooldown_minutes', 120),
+        languageCooldownMinutes: 0,
       },
       autoResume: {
         enabled: config.AUTO_RESUME,
@@ -984,7 +984,7 @@ export function createWebServer(player: GuildPlayer) {
       return c.json({ error: 'Could not generate embedding for target vibe' }, 400);
     }
 
-    const morphSteps = body.steps || dynamicSettings.getNumber('curation_morph_steps', 4);
+    const morphSteps = body.steps || 4;
     stationCurator.startMorph(targetVibe, vector, morphSteps);
     await player.recurateAutoplayBuffer();
     return c.json({ success: true, morph: stationCurator.getMorphState() });

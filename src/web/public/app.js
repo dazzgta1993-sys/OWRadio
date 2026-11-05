@@ -2528,11 +2528,6 @@ function renderConfigSettings(settings) {
       title: '🤖 Discord Bot & Sticky Widget Experience',
       badge: 'Discord',
     },
-    {
-      id: 'Radar & Storage',
-      title: '🛰️ Autonomous Radar & Storage',
-      badge: 'Radar',
-    },
   ];
 
   let html = '';

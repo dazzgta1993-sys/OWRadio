@@ -159,39 +159,8 @@ export interface ActiveLanguageCooldown {
 /**
  * Returns currently active foreign language cooldown locks.
  */
-export function getActiveLanguageCooldowns(cooldownMinutes?: number): ActiveLanguageCooldown[] {
-  const mins = cooldownMinutes ?? dynamicSettings.getNumber('curation_language_cooldown_minutes', 1440);
-  const now = Math.floor(Date.now() / 1000);
-  const cutoff = now - mins * 60;
-
-  const recent = stmtRecentPlaysLanguage.all(cutoff) as Array<{
-    title: string;
-    artist_name: string;
-    played_at: number;
-  }>;
-
-  const result: ActiveLanguageCooldown[] = [];
-  const seenLangs = new Set<TrackLanguage>();
-
-  for (const row of recent) {
-    const lang = 'en';
-    if (lang !== 'en' && !seenLangs.has(lang)) {
-      seenLangs.add(lang);
-      const meta = LANGUAGE_METADATA[lang as string] || { name: String(lang).toUpperCase(), flag: '🌍' };
-      const remainingSec = Math.max(0, (row.played_at + mins * 60) - now);
-      result.push({
-        language: lang,
-        languageName: meta.name,
-        flag: meta.flag,
-        lastTitle: row.title,
-        lastArtist: row.artist_name,
-        lastPlayedAt: row.played_at,
-        remainingSec,
-      });
-    }
-  }
-
-  return result;
+export function getActiveLanguageCooldowns(): ActiveLanguageCooldown[] {
+  return [];
 }
 
 /**
@@ -369,39 +338,6 @@ export function isTrackEligibleForAutoplay(
     if (cached2hNormArtists.has(normArtist)) return false;
   }
 
-  // 4. Global Foreign Language Cooldown (Dynamic setting, default: 1440m / 24 hours)
-  // Enforces max 1 foreign track per day across the entire station
-  const langCooldownMinutes = dynamicSettings.getNumber('curation_language_cooldown_minutes', 1440);
-  if (langCooldownMinutes > 0) {
-    const trackLang = 'en';
-    if (trackLang !== 'en') {
-      // 4A. In-memory queue check: no foreign song can enter if any foreign track is already queued
-      if (queuedLanguages && queuedLanguages.size > 0) {
-        return false;
-      }
-
-      // 4B. Playback history cooldown check: enforce maximum 1 foreign track per cooldown window across ALL languages
-      const cutoffLang = now - langCooldownMinutes * 60;
-      if (!cachedLanguageCooldownMap || now > cachedLanguageExpiry) {
-        const recentPlays = stmtRecentPlaysLanguage.all(cutoffLang) as Array<{ title: string; artist_name: string; played_at: number }>;
-        const freshMap = new Map<TrackLanguage, { title: string; artist: string; playedAt: number }>();
-        for (const row of recentPlays) {
-          const l = 'en';
-          if (l !== 'en' && !freshMap.has(l)) {
-            freshMap.set(l, { title: row.title, artist: row.artist_name, playedAt: row.played_at });
-          }
-        }
-        cachedLanguageCooldownMap = freshMap;
-        cachedLanguageExpiry = now + 5; // Cache for 5s to eliminate SQL loop thrashing
-      }
-
-      // If ANY foreign language track has played within the cooldown window, block this candidate!
-      if (cachedLanguageCooldownMap.size > 0) {
-        return false;
-      }
-    }
-  }
-
   return true;
 }
 
@@ -409,27 +345,7 @@ export function isTrackEligibleForAutoplay(
  * Checks whether foreign language playback is locked across the station under the 99.9% English purity guardrail.
  */
 export function isForeignLanguageLocked(lang: TrackLanguage, queuedLanguages?: Set<string>): boolean {
-  if (lang === 'en') return false;
-  if (queuedLanguages && queuedLanguages.size > 0) return true;
-
-  const langCooldownMinutes = dynamicSettings.getNumber('curation_language_cooldown_minutes', 1440);
-  if (langCooldownMinutes <= 0) return false;
-
-  const now = Math.floor(Date.now() / 1000);
-  const cutoffLang = now - langCooldownMinutes * 60;
-  if (!cachedLanguageCooldownMap || now > cachedLanguageExpiry) {
-    const recentPlays = stmtRecentPlaysLanguage.all(cutoffLang) as Array<{ title: string; artist_name: string; played_at: number }>;
-    const freshMap = new Map<TrackLanguage, { title: string; artist: string; playedAt: number }>();
-    for (const row of recentPlays) {
-      const l = 'en';
-      if (l !== 'en' && !freshMap.has(l)) {
-        freshMap.set(l, { title: row.title, artist: row.artist_name, playedAt: row.played_at });
-      }
-    }
-    cachedLanguageCooldownMap = freshMap;
-    cachedLanguageExpiry = now + 5;
-  }
-  return cachedLanguageCooldownMap.size > 0;
+  return false;
 }
 
 /**

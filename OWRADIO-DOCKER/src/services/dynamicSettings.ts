@@ -10,7 +10,7 @@ import { sqlite } from '../db/index.js';
 
 export interface SettingDefinition<T = any> {
   key: string;
-  category: 'Curation' | 'Audio & Mixing' | 'Discord' | 'Radar & Storage';
+  category: 'Curation' | 'Audio & Mixing' | 'Discord';
   name: string;
   description: string;
   type: 'number' | 'boolean' | 'string';
@@ -57,19 +57,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     unit: 'h',
   },
   {
-    key: 'curation_language_cooldown_minutes',
-    category: 'Curation',
-    name: 'Global Foreign Track Cooldown',
-    description: 'Minimum minutes between any foreign language tracks across the station (1440m = maximum 1 foreign track per 24 hours).',
-    type: 'number',
-    control: 'slider',
-    defaultValue: 1440,
-    min: 60,
-    max: 2880,
-    step: 60,
-    unit: 'min',
-  },
-  {
     key: 'curation_baseline_artists',
     category: 'Curation',
     name: 'Baseline Seed Artists',
@@ -113,47 +100,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     unit: 'tracks',
   },
   {
-    key: 'curation_diversity_threshold',
-    category: 'Curation',
-    name: 'Latent Diversity Guard (Anti-Clustering)',
-    description: 'Maximum cosine similarity between consecutive autoplay picks in 384-d latent space.',
-    type: 'number',
-    control: 'slider',
-    defaultValue: 0.85,
-    min: 0.60,
-    max: 0.98,
-    step: 0.01,
-    unit: 'cos',
-  },
-  {
-    key: 'curation_consensus_ratio',
-    category: 'Curation',
-    name: 'Tug-of-War Consensus Weight',
-    description: 'Weight of multi-listener mathematical consensus (1.0 = pure intersection, 0.0 = individual taste).',
-    type: 'number',
-    control: 'slider',
-    defaultValue: 0.30,
-    min: 0.0,
-    max: 1.0,
-    step: 0.05,
-    unit: '%',
-  },
-  {
-    key: 'curation_morph_steps',
-    category: 'Curation',
-    name: 'DJ Morph Trajectory Steps',
-    description: 'Number of intermediate tracks used when smoothly steering from current room taste to a target vibe.',
-    type: 'number',
-    control: 'radio',
-    defaultValue: 4,
-    options: [
-      { label: '2 Tracks (Fast)', value: 2 },
-      { label: '4 Tracks (Standard)', value: 4 },
-      { label: '6 Tracks (Gradual)', value: 6 },
-      { label: '8 Tracks (Extended)', value: 8 },
-    ],
-  },
-  {
     key: 'curation_playlist_blend_mode',
     category: 'Curation',
     name: 'Playlist Multi-User Blending Mode',
@@ -175,15 +121,6 @@ export const SETTING_DEFINITIONS: SettingDefinition[] = [
     type: 'boolean',
     control: 'toggle',
     defaultValue: false,
-  },
-  {
-    key: 'curation_english_purity',
-    category: 'Curation',
-    name: '95% English Track Purity Guard',
-    description: 'Strictly filter out foreign and non-Latin chart tracks from autonomous discovery.',
-    type: 'boolean',
-    control: 'toggle',
-    defaultValue: true,
   },
   {
     key: 'curation_filter_live',

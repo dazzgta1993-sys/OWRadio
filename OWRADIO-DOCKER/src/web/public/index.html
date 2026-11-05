@@ -2515,10 +2515,6 @@
               <div style="background: rgba(0,0,0,0.5); padding: 12px; border-radius: 8px; border: 1px solid var(--card-border);">
                 <span class="code-pill" style="font-size: 13px;">musicbot logs</span>
               </div>
-              <div class="settings-row">
-                <span class="settings-label">Model Endpoint</span>
-                <span class="code-pill">http://127.0.0.1:11434</span>
-              </div>
             </div>
           </div>
         </div>
@@ -2600,15 +2596,14 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <div>
           <h2 style="font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-            ⚙️ System Settings &amp; Autonomous Feature Flags
+            ⚙️ Station Settings &amp; Audio Controls
           </h2>
           <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-            Granularly toggle on/off every single autonomous engine subsystem, audio DSP pipeline, and curator preset.
+            Fine-tune repeat cooldowns, audio crossfades, content filters, and station curation behavior in real time.
           </p>
         </div>
         <div style="display: flex; gap: 10px; align-items: center;">
-          <span id="features-active-count-l4" class="badge-tag" style="background: rgba(16, 185, 129, 0.15); color: #34d399; font-size: 12px; padding: 6px 12px;">12 / 12 ACTIVE</span>
-          <button class="btn btn-primary" onclick="loadFeatureFlags(); loadSettingsSubsystems();" style="padding: 8px 16px; font-size: 13px;">
+          <button class="btn btn-primary" onclick="loadSettingsSubsystems();" style="padding: 8px 16px; font-size: 13px;">
             🔄 Reload Settings
           </button>
           <button class="btn" onclick="resetAllConfigSettings()" style="padding: 8px 14px; font-size: 13px; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
