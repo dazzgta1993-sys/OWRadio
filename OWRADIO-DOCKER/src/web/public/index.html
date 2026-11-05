@@ -2103,7 +2103,7 @@
           <span class="badge-num">2</span> Studio Dashboard
         </button>
         <button class="level-tab" data-level="3" onclick="switchLevel(3)">
-          <span class="badge-num">3</span> 📊 Station Intel
+          <span class="badge-num">3</span> 📜 History &amp; Cooldowns
         </button>
         <button class="level-tab" data-level="4" onclick="switchLevel(4)">
           <span class="badge-num">4</span> ⚙️ Settings
@@ -2285,30 +2285,18 @@
          LEVEL 3: BRAIN LOGS & OBSERVABILITY CENTER
          ======================================================== -->
     <div id="view-level-3">
-      <!-- Header with title & actions -->
+      <!-- Header with title & refresh -->
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
         <div>
           <h2 style="font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-            📊 Station Intelligence & Music Analytics
+            📜 Playback History &amp; Cooldowns
           </h2>
           <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-            Deep-dive inspection into listener taste profiles, artist affinity matrix, 48h/2h anti-repetition cooldowns, and permanent room vetoes.
+            Live log of played tracks and active 48h song / 2h artist anti-repetition cooldown locks.
           </p>
         </div>
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-          <!-- Multi-Engine Instant Switcher -->
-          <div style="display: flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); padding: 6px 14px; border-radius: 9999px;">
-            <span style="font-size: 13px;">🎵</span>
-            <span style="font-size: 12px; font-weight: 700; color: #38bdf8;">Deezer + MusicBrainz + YouTube Music</span>
-          </div>
-
-          <button id="btn-test-chime" class="btn" onclick="triggerTestChime()" style="padding: 9px 14px; font-size: 13px;">
-            🔔 Test Hourly Chime
-          </button>
-          <button id="btn-test-curation" class="btn btn-primary" onclick="triggerTestCuration()" style="padding: 9px 16px; font-size: 13px;">
-            🧪 Dry-Run Curation
-          </button>
-          <button class="btn" onclick="fetchBrainData()" style="padding: 9px 14px; font-size: 13px;">
+        <div>
+          <button class="btn btn-primary" onclick="fetchBrainData()" style="padding: 9px 16px; font-size: 13px;">
             🔄 Refresh
           </button>
         </div>
@@ -2316,6 +2304,13 @@
 
       <!-- Sub-navigation tabs within Level 3 -->
       <div class="brain-subnav">
+        <button id="brain-tab-cooldown" class="brain-tab-btn active" onclick="switchBrainSubTab('cooldown')">
+          🛡️ Anti-Repetition &amp; Cooldowns (<span id="brain-badge-cooldown-count">0</span>)
+        </button>
+        <button id="brain-tab-pref" class="brain-tab-btn" onclick="switchBrainSubTab('pref')">
+          ❤️ Listener Preferences (<span id="brain-badge-pref-count">0</span>)
+        </button>
+      </div>
         <button id="brain-tab-pref" class="brain-tab-btn active" onclick="switchBrainSubTab('pref')">
           ❤️ Taste & Preference Matrix (<span id="brain-badge-pref-count">0</span>)
         </button>
@@ -2334,17 +2329,7 @@
       </div>
 
       <!-- Brain Section 2: Taste & Preference Matrix -->
-      <div id="brain-section-pref" style="display: block;">
-        <!-- Formula Explainer Banner -->
-        <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-          <div style="font-weight: 700; color: #a5b4fc; font-size: 13px; margin-bottom: 4px;">📐 Affinity Score Formula:</div>
-          <div style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #e2e8f0;">
-            Score = (Likes × 3.0) + (Full_Plays × 1.0) - (Early_Skips × 1.5) - (Dislikes × 4.0)
-          </div>
-          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">
-            Full Play (+1.0) triggers after 80% completion for all room listeners. Early Skip (-1.5) triggers if skipped &lt;35%. Dislike (-4.0) vetos artist for the room.
-          </div>
-        </div>
+      <div id="brain-section-pref" style="display: none;">
 
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap;">
           <div style="display: flex; gap: 8px; align-items: center; flex: 1;">
@@ -2389,7 +2374,7 @@
       </div>
 
       <!-- Brain Section 3: Anti-Repetition & Cooldowns -->
-      <div id="brain-section-cooldown" style="display: none;">
+      <div id="brain-section-cooldown" style="display: block;">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
           <!-- Left: 48-Hour Song Cooldowns -->
           <div class="card" style="padding: 20px;">
@@ -2468,128 +2453,7 @@
         </div>
       </div>
 
-      <!-- Brain Section 4: Room Taste Profile & Vetos -->
-      <div id="brain-section-room" style="display: none;">
-        <div class="settings-grid">
-          <!-- Room Listeners -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-card-title">🎙️ Present Listeners</span>
-              <span id="brain-room-listeners-badge" class="badge-tag">0 PRESENT</span>
-            </div>
-            <div id="brain-room-listeners-list" class="settings-list">
-              <span style="color: var(--text-muted);">No non-bot listeners in voice channel</span>
-            </div>
-          </div>
-
-          <!-- Room Top Liked Artists -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-card-title">🌟 Room Top Liked Artists</span>
-              <span class="badge-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399;">AFFINITY &gt; 0</span>
-            </div>
-            <div id="brain-room-artists-list" class="settings-list">
-              <span style="color: var(--text-muted);">No common liked artists yet</span>
-            </div>
-          </div>
-
-          <!-- Room Vetoes / Disliked Artists -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-card-title">⛔ Room Vetoes & Dislikes</span>
-              <span class="badge-tag" style="background: rgba(239, 68, 68, 0.2); color: #f87171;">ROOM BLACKLIST</span>
-            </div>
-            <div id="brain-room-vetoes-list" class="settings-list">
-              <span style="color: var(--text-muted);">No active vetoes in room</span>
-            </div>
-          </div>
-
-          <!-- System CLI & Fast Commands -->
-          <div class="settings-card">
-            <div class="settings-card-header">
-              <span class="settings-card-title">💻 Server CLI Shortcut</span>
-              <span class="badge-tag">CLI ALIAS</span>
-            </div>
-            <div class="settings-list">
-              <p style="color: var(--text-muted); font-size: 12px;">Run this command in SSH on the Oracle VM anytime for real-time live logs:</p>
-              <div style="background: rgba(0,0,0,0.5); padding: 12px; border-radius: 8px; border: 1px solid var(--card-border);">
-                <span class="code-pill" style="font-size: 13px;">musicbot logs</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Brain Section 6: Station DNA & Baseline Preferences -->
-      <div id="brain-section-baseline" style="display: none;">
-        <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-            <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px;">
-              🧬 Station DNA (Baseline Seed Preferences)
-            </h3>
-            <span class="badge-tag" style="background: rgba(99, 102, 241, 0.2); color: #818cf8;">LOW-WEIGHT SCAFFOLD</span>
-          </div>
-          <p style="color: var(--text-muted); font-size: 13px; line-height: 1.5; margin: 0 0 16px 0;">
-            These baseline artists and genres define VEXO's foundational sound when room listeners have no preferences yet or the room is empty. Real user interactions (<code class="code-pill">/play</code>, <code class="code-pill">👍 Like</code>, <code class="code-pill">👎 Dislike</code>) naturally steer and completely overwrite this baseline over time.
-          </p>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
-            <!-- Baseline Artists Card -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-weight: 700; font-size: 14px; color: #e2e8f0;">🎤 Baseline Artists</span>
-                <span id="baseline-artists-count" style="font-size: 12px; color: var(--text-muted);">0 Artists</span>
-              </div>
-              <div id="baseline-artists-chips" style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 50px; margin-bottom: 12px;">
-                <!-- Chips rendered dynamically -->
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <input id="input-new-baseline-artist" type="text" placeholder="Add artist (e.g. Coldplay)..." style="flex: 1; padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.4); color: #fff;" onkeydown="if(event.key==='Enter') addBaselineArtist()" />
-                <button class="btn btn-primary" onclick="addBaselineArtist()" style="padding: 8px 14px; font-size: 13px;">+ Add</button>
-              </div>
-            </div>
-
-            <!-- Baseline Genres Card -->
-            <div style="background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                <span style="font-weight: 700; font-size: 14px; color: #e2e8f0;">🎸 Baseline Genres</span>
-                <span id="baseline-genres-count" style="font-size: 12px; color: var(--text-muted);">0 Genres</span>
-              </div>
-              <div id="baseline-genres-chips" style="display: flex; flex-wrap: wrap; gap: 8px; min-height: 50px; margin-bottom: 12px;">
-                <!-- Chips rendered dynamically -->
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <input id="input-new-baseline-genre" type="text" placeholder="Add genre (e.g. indie rock)..." style="flex: 1; padding: 8px 12px; font-size: 13px; border-radius: 6px; border: 1px solid var(--card-border); background: rgba(0,0,0,0.4); color: #fff;" onkeydown="if(event.key==='Enter') addBaselineGenre()" />
-                <button class="btn btn-primary" onclick="addBaselineGenre()" style="padding: 8px 14px; font-size: 13px;">+ Add</button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Controls Grid: Influence Weight & Language Cooldown -->
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: rgba(0,0,0,0.25); border: 1px solid var(--card-border); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span style="font-weight: 600; font-size: 13px; color: #cbd5e1;">Baseline Influence Weight</span>
-                <span id="baseline-weight-val" style="font-weight: 700; font-size: 13px; color: #818cf8;">0.5</span>
-              </div>
-              <input id="baseline-weight-slider" type="range" min="0.1" max="2.0" step="0.1" value="0.5" style="width: 100%;" oninput="document.getElementById('baseline-weight-val').innerText = this.value" onchange="saveBaselineWeight(this.value)" />
-              <p style="color: var(--text-muted); font-size: 11px; margin: 4px 0 0 0;">Low (0.1–0.5) lets human likes instantly steer. High (1.5–2.0) keeps a stronger station format.</p>
-            </div>
-            
-              <input id="foreign-cooldown-slider" type="range" min="60" max="2880" step="60" value="1440" style="width: 100%;" oninput="document.getElementById('foreign-cooldown-val').innerText = (this.value / 60).toFixed(0) + ' Hours'" onchange="updateDynamicConfigSetting('curation_language_cooldown_minutes', Number(this.value))" />
-              <p style="color: var(--text-muted); font-size: 11px; margin: 4px 0 0 0;">Strict 24h cooldown allows at most 1 rare foreign track per day for a 99.9% English audience.</p>
-            </div>
-          </div>
-
-          <div style="display: flex; justify-content: flex-end; gap: 10px;">
-            <button class="btn" onclick="resetBaselineToDefaults()" style="padding: 8px 14px; font-size: 13px;">↺ Reset to Standard DNA</button>
-            <button class="btn btn-primary" onclick="loadBaselineData()" style="padding: 8px 16px; font-size: 13px;">🔄 Refresh DNA</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================================
+      <!-- ========================================================
          LEVEL 4: DEDICATED SETTINGS & FEATURE FLAG CONTROLS
          ======================================================== -->
     <div id="view-level-4" style="display: none; animation: fadeIn 0.3s ease;">

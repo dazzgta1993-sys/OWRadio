@@ -805,7 +805,7 @@ function formatCountdown(remainingSec) {
 
 function switchBrainSubTab(tab) {
   currentBrainSubTab = tab;
-  const tabs = ['pref', 'cooldown', 'vetoes', 'room', 'baseline'];
+  const tabs = ['cooldown', 'pref'];
   tabs.forEach((t) => {
     const btn = document.getElementById(`brain-tab-${t}`);
     const sec = document.getElementById(`brain-section-${t}`);
