@@ -46,7 +46,7 @@ export interface PlayerStatePayload {
   timeCapsuleYear?: number | null;
   morph?: ReturnType<typeof stationCurator['getMorphState']>;
   audioMeter?: { rms: number; peak: number; bands: number[] };
-  brainPills?: BrainPillPayload[];
+  brainPills?: any[];
   activeBrainCount?: number;
   totalBrainCount?: number;
 }
@@ -97,7 +97,7 @@ export class GuildPlayer extends EventEmitter {
             console.warn(`[GuildPlayer] Background queue stream resolution error for "${track.title}":`, (err as Error).message);
           }
           await new Promise((r) => setTimeout(r, 100));
-        }        }
+        }
 
         // Continuously feed newly resolved streams into multi-deck standby pool
         if (track.streamUrl) {

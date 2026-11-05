@@ -1,3 +1,5 @@
+export type TrackLanguage = string;
+const LANGUAGE_METADATA: Record<string, { name: string; flag: string }> = {};
 /**
  * @file curator.ts
  * @description 48-Hour Anti-Repeat, Active Voice Room Taste Blending, and Dynamic Deezer Deep-Cut Fallback Engine.
@@ -32,7 +34,7 @@ export function setEngine(engine: CurationEngineType): void {
 
 export interface CuratedTrackResult {
   track: DeezerTrackMetadata;
-  curatedBy: 'AI Room Mix' | 'AI Wildcard' | 'JEPA Vector Latent' | 'Jev Decision Engine' | 'Dynamic Taste Deep-Cut' | 'Dynamic Era Roulette' | 'Dynamic Genre Explorer' | 'User Request';
+  curatedBy: string;
   curationReason: string;
 }
 
@@ -175,7 +177,7 @@ export function getActiveLanguageCooldowns(cooldownMinutes?: number): ActiveLang
     const lang = 'en';
     if (lang !== 'en' && !seenLangs.has(lang)) {
       seenLangs.add(lang);
-      const meta = LANGUAGE_METADATA[lang] || { name: lang.toUpperCase(), flag: '🌍' };
+      const meta = LANGUAGE_METADATA[lang as string] || { name: String(lang).toUpperCase(), flag: '🌍' };
       const remainingSec = Math.max(0, (row.played_at + mins * 60) - now);
       result.push({
         language: lang,
@@ -799,7 +801,7 @@ export async function getNextAutoplayTracks(
           const normA = normalizeArtist(track.artist).replace(/\s+/g, '');
           if (normA) queuedArtists.add(normA);
           queuedDedupeKeys.add(getTrackDedupeKey(track.title, track.artist));
-          const lang = 'en'.isrc, track.id);
+          const lang = 'en';
           if (lang !== 'en') queuedLanguages.add(lang);
           results.push({
             track,

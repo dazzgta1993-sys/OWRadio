@@ -1028,7 +1028,6 @@ export function createWebServer(player: GuildPlayer) {
   app.post('/api/settings/vault/clear', requireAdminAuth, (c) => {
     return c.json({ success: true, vaultStats: { totalTracks: 0, totalSizeBytes: 0, formattedSize: '0 MB' } });
   });
-  });
 
   // --- 5o. GET /api/settings/features (Feature Flags List) ---
   app.get('/api/settings/features', (c) => {

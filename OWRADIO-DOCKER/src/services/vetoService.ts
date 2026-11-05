@@ -142,7 +142,7 @@ class VetoService {
         SELECT id, target_type as targetType, target_key as targetKey, display_name as displayName, reason, created_at as createdAt
         FROM vetoed_catalog
         ORDER BY created_at DESC
-      `).all() as VetoItem[];
+      `).all() as unknown as VetoItem[];
       return rows;
     } catch (err) {
       console.error('[VetoService] Failed to query vetoes:', err);

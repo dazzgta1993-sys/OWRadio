@@ -346,6 +346,7 @@ export async function getStreamUrl(videoId: string): Promise<string | null> {
 
 export default {
   searchTracks,
+  searchYouTubeMusic,
   getTrack,
   getPlaylistTracks,
   getStreamUrl,

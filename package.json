@@ -1,55 +1,30 @@
 {
   "name": "owradio",
   "version": "2.1.0",
-  "description": "OWRadio - Open Web Radio & Discord Audio Engine optimized for self-hosting on Oracle Cloud Infrastructure Always Free Tier",
+  "description": "OWRadio - Open Web Radio and Discord Audio Engine",
   "license": "MIT",
-  "keywords": [
-    "web-radio",
-    "discord-music-bot",
-    "oracle-cloud",
-    "audiophile",
-    "ai-dj",
-    "pcm-streaming"
-  ],
-  "main": "src/index.ts",
   "type": "module",
+  "main": "src/index.ts",
   "scripts": {
     "start": "tsx src/index.ts",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test:auth": "tsx tests/test_auth_subsystem.ts",
-    "test:meter": "tsx tests/test_audio_meter.ts",
-    "test:db": "tsx tests/verify_db.ts",
-    "test:stream": "tsx tests/verify_stream.ts",
-    "test:curator": "tsx tests/verify_curator.ts",
-    "test:engine": "tsx tests/verify_multi_engine.ts",
-    "test:autoresume": "tsx tests/verify_autoresume.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@discordjs/opus": "^0.10.0",
     "@discordjs/voice": "^0.19.2",
     "@hono/node-server": "^1.13.8",
-    "better-sqlite3": "^11.8.0",
     "discord.js": "^14.18.0",
     "dotenv": "^16.4.7",
-    "drizzle-orm": "^0.39.0",
     "hono": "^4.7.0",
     "libsodium-wrappers": "^0.8.4",
+    "opusscript": "^0.0.8",
     "prism-media": "^1.3.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.13.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
-  },
-  "allowScripts": {
-    "better-sqlite3@11.10.0": true,
-    "esbuild@0.18.20": true,
-    "esbuild@0.19.12": true,
-    "esbuild@0.28.2": true,
-    "@discordjs/opus@0.10.0": true
   }
 }

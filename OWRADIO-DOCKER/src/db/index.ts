@@ -1,14 +1,12 @@
 /**
  * @file index.ts
- * @description SQLite database connection and self-bootstrapping schema initialization using better-sqlite3 and Drizzle ORM.
+ * @description SQLite database connection and self-bootstrapping schema initialization using built-in node:sqlite.
  */
 
-import Database, { type Database as DatabaseInstance } from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import path from 'node:path';
 import config from '../config.js';
-import * as schema from './schema.js';
 
 // Ensure data directory exists
 const dbDir = path.dirname(config.DATABASE_PATH);
@@ -16,10 +14,58 @@ if (!fs.existsSync(dbDir)) {
   fs.mkdirSync(dbDir, { recursive: true });
 }
 
+export class SQLiteWrapper {
+  private db: DatabaseSync;
+
+  constructor(filePath: string) {
+    this.db = new DatabaseSync(filePath);
+  }
+
+  pragma(str: string): void {
+    try {
+      this.db.exec(`PRAGMA ${str};`);
+    } catch {}
+  }
+
+  exec(sql: string): void {
+    this.db.exec(sql);
+  }
+
+  prepare(sql: string) {
+    const stmt = this.db.prepare(sql);
+    return {
+      run: (...params: any[]) => stmt.run(...params),
+      get: (...params: any[]) => stmt.get(...params),
+      all: (...params: any[]) => stmt.all(...params),
+    };
+  }
+
+  transaction<T extends (...args: any[]) => any>(fn: T): T {
+    const runInTx = (...args: Parameters<T>): ReturnType<T> => {
+      this.db.exec('BEGIN TRANSACTION');
+      try {
+        const res = fn(...args);
+        this.db.exec('COMMIT');
+        return res;
+      } catch (err) {
+        this.db.exec('ROLLBACK');
+        throw err;
+      }
+    };
+    return runInTx as T;
+  }
+
+  close(): void {
+    try {
+      this.db.close();
+    } catch {}
+  }
+}
+
 /**
- * Underlying better-sqlite3 database connection instance.
+ * Underlying SQLite database connection instance (powered by built-in node:sqlite).
  */
-export const sqlite: DatabaseInstance = new Database(config.DATABASE_PATH);
+export const sqlite = new SQLiteWrapper(config.DATABASE_PATH);
 
 // Optimize SQLite for high concurrency and write performance
 sqlite.pragma('journal_mode = WAL');
@@ -28,7 +74,7 @@ sqlite.pragma('foreign_keys = ON');
 
 /**
  * Programmatically initialize database tables and indexes on application boot.
- * This ensures VEXO is completely zero-config and self-bootstrapping without external CLI migration steps.
+ * This ensures OWRadio is completely zero-config and self-bootstrapping without external CLI migration steps.
  */
 function initSchema(): void {
   sqlite.exec(`
@@ -182,8 +228,4 @@ export function setBotState(key: string, value: string): void {
   }
 }
 
-/**
- * Type-safe Drizzle ORM client instance.
- */
-export const db = drizzle(sqlite, { schema });
-export default db;
+export default sqlite;
