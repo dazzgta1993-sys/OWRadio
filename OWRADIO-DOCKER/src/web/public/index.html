@@ -17,20 +17,22 @@
     </div>
 
     <div class="search-wrap">
-      <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input
-          id="searchInput"
-          type="text"
-          placeholder="Search track, artist, album, or paste Spotify / YouTube / Deezer URL..."
-          autocomplete="off"
-        />
+      <div class="search-bar-row">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="Search song, artist, album, or paste Spotify / YouTube / Deezer link..."
+            autocomplete="off"
+          />
+        </div>
         <select id="searchSourceSelect" class="source-select" title="Catalog Source">
           <option value="auto" selected>🌐 Multi-Engine Auto</option>
-          <option value="ytmusic">🔴 YouTube Music (WEB_REMIX)</option>
+          <option value="ytmusic">🔴 YouTube Music</option>
           <option value="deezer">🟣 Deezer Studio</option>
           <option value="apple">🍎 Apple Music</option>
-          <option value="youtube">▶️ YouTube Live &amp; Video</option>
+          <option value="youtube">▶️ YouTube Live/Video</option>
         </select>
         <button id="playQueryBtn" class="btn btn-primary">▶ Play</button>
         <button id="queueQueryBtn" class="btn btn-secondary">+ Queue</button>

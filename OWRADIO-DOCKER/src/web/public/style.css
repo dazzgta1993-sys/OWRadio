@@ -20,7 +20,7 @@ body {
   padding: 12px 24px; background: #0e0f17; border-bottom: 1px solid var(--border);
   position: sticky; top: 0; z-index: 50;
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .brand-icon {
   width: 36px; height: 36px; border-radius: 10px;
   background: linear-gradient(135deg, var(--accent), #6366f1);
@@ -28,17 +28,19 @@ body {
 }
 .brand-title { font-weight: 700; font-size: 16px; }
 .brand-sub { font-size: 10px; color: var(--text-muted); letter-spacing: 0.8px; }
-.search-wrap { flex: 1; max-width: 720px; position: relative; }
+.search-wrap { flex: 1; max-width: 860px; position: relative; }
+.search-bar-row { display: flex; align-items: center; gap: 8px; width: 100%; }
 .search-box {
-  display: flex; align-items: center; background: var(--bg-card);
-  border: 1px solid var(--border); border-radius: 10px; padding: 4px 6px 4px 12px; gap: 8px;
+  flex: 1; min-width: 220px; display: flex; align-items: center; background: var(--bg-card);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; gap: 8px;
 }
+.search-box:focus-within { border-color: var(--accent); }
 .search-box input {
-  flex: 1; background: transparent; border: none; color: var(--text-main); font-size: 13px; outline: none;
+  flex: 1; width: 100%; background: transparent; border: none; color: var(--text-main); font-size: 13px; outline: none;
 }
 .source-select {
-  background: #1a1c29; color: var(--text-main); border: 1px solid var(--border);
-  border-radius: 7px; padding: 6px 8px; font-size: 11px; font-weight: 600; outline: none; cursor: pointer;
+  flex-shrink: 0; background: var(--bg-card); color: var(--text-main); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 10px; font-size: 12px; font-weight: 600; outline: none; cursor: pointer;
 }
 .search-dropdown {
   position: absolute; top: calc(100% + 6px); left: 0; right: 0;
@@ -46,8 +48,8 @@ body {
   max-height: 400px; overflow-y: auto; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7); z-index: 100;
 }
 .btn {
-  border: none; border-radius: 8px; padding: 7px 13px; font-size: 12px;
-  font-weight: 600; cursor: pointer; transition: 0.15s;
+  flex-shrink: 0; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px;
+  font-weight: 600; cursor: pointer; transition: 0.15s; white-space: nowrap;
 }
 .btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: var(--accent-hover); }
