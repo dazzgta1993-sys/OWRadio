@@ -1416,7 +1416,9 @@ export class GuildPlayer extends EventEmitter {
         console.log(`[GuildPlayer] Cleared Discord Voice Channel Status.`);
       }
     } catch (err) {
-      console.warn(`[GuildPlayer] Could not update Voice Channel Status: ${(err as Error).message}`);
+      if ((err as any)?.code !== 50013 && !(err as Error)?.message?.includes('Missing Permissions')) {
+        console.warn(`[GuildPlayer] Could not update Voice Channel Status: ${(err as Error).message}`);
+      }
     }
   }
 
