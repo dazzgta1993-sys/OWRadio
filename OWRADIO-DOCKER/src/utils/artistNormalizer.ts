@@ -60,6 +60,22 @@ export function extractPrimaryArtist(artistStr: string): string {
   return parts[0] || (artistStr || '').trim();
 }
 
+/**
+ * Extracts all credited artists from both the artist string AND any (feat. / ft. / with)
+ * clauses inside the song title so featured artists never play back-to-back.
+ */
+export function extractAllTrackArtists(artistStr: string, titleStr = ''): string[] {
+  const result = new Set<string>(splitCollabArtists(artistStr));
+  const featRegex = /(?:[\(\[]|\s+)(?:feat\.?|ft\.?|featuring|with)\s+([^\)\]]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = featRegex.exec(titleStr || '')) !== null) {
+    for (const sub of splitCollabArtists(m[1])) {
+      result.add(sub);
+    }
+  }
+  return Array.from(result);
+}
+
 export function normalizeNameForMatch(s: string): string {
   let clean = (s || '')
     .toLowerCase()
