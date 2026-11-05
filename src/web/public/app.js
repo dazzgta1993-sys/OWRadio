@@ -113,11 +113,15 @@ el.listenLiveBtn.addEventListener('click', () => {
 // --- Search & Direct Play / Queue ---
 window.triggerPlayOrQueue = async function (payload, mode = 'now') {
   el.searchDropdown.classList.add('hidden');
-  await fetch('/api/play', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ source: el.searchSource.value, ...payload, mode }),
-  });
+  try {
+    const res = await fetch('/api/play', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source: el.searchSource.value, ...payload, mode }),
+    });
+    const data = await res.json();
+    if (data.state && window.renderState) window.renderState(data.state);
+  } catch {}
 };
 
 el.playQueryBtn.addEventListener('click', () => {
@@ -184,7 +188,13 @@ document.addEventListener('click', (e) => {
 });
 
 // --- Transport Controls ---
-const sendAction = (act) => fetch(`/api/player/${act}`, { method: 'POST' });
+const sendAction = async (act) => {
+  try {
+    const res = await fetch(`/api/player/${act}`, { method: 'POST' });
+    const data = await res.json();
+    if (data.state && window.renderState) window.renderState(data.state);
+  } catch {}
+};
 el.playPauseBtn.addEventListener('click', () => sendAction('toggle'));
 el.skipBtn.addEventListener('click', () => sendAction('skip'));
 el.stopBtn.addEventListener('click', () => sendAction('stop'));
@@ -194,8 +204,10 @@ el.likeBtn.addEventListener('click', () => sendAction('like'));
 el.dislikeBtn.addEventListener('click', () => sendAction('dislike'));
 el.clearQueueBtn.addEventListener('click', () => sendAction('clear'));
 if (el.autoplayBtn) {
-  el.autoplayBtn.addEventListener('click', () => {
+  el.autoplayBtn.addEventListener('click', async () => {
     const nextVal = !(window.currentShow && window.currentShow.autoplay !== false);
-    fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoplay: nextVal }) });
+    const res = await fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoplay: nextVal }) });
+    const data = await res.json();
+    if (data.state && window.renderState) window.renderState(data.state);
   });
 }

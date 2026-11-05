@@ -111,13 +111,25 @@ function renderDiscographyGrid() {
 window.el.discoSearchBtn.addEventListener('click', () => loadArtistDiscography());
 window.el.discoArtistInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadArtistDiscography(); });
 window.el.discoCategorySelect.addEventListener('change', renderDiscographyGrid);
+window.el.nowPlayingArtist.addEventListener('click', () => {
+  const art = window.currentShow?.nowPlaying?.artist;
+  if (art) {
+    document.querySelector('.tab-btn[data-tab="discography"]')?.click();
+    loadArtistDiscography(art);
+  }
+});
 
 // --- Vibe Engine Controls ---
+const postVibe = async (payload) => {
+  const res = await fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (data.state) renderState(data.state);
+};
 document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((btn) =>
-  btn.addEventListener('click', () => fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: btn.dataset.mode }) }))
+  btn.addEventListener('click', () => postVibe({ mode: btn.dataset.mode }))
 );
 document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((btn) =>
-  btn.addEventListener('click', () => fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ engine: btn.dataset.engine }) }))
+  btn.addEventListener('click', () => postVibe({ engine: btn.dataset.engine }))
 );
 
 // --- Render Live State ---
@@ -185,13 +197,21 @@ function renderState(s) {
         </div>
         <div class="track-row-actions">
           <span style="font-size:11px;color:#9ca3af;">${window.escapeHtml(t.durationFormatted || window.formatSecs(t.duration))}</span>
+          <button class="btn btn-primary q-play" data-idx="${i}" title="Play Now">▶</button>
           <button class="btn btn-small q-remove" data-idx="${i}" title="Remove">✕</button>
         </div>
       </div>`).join('')
     : '<div style="padding:20px;color:#9ca3af;text-align:center;">Queue is clear — Autoplay Vibe Engine will cue Deck 2 & Deck 3 automatically once a song plays.</div>';
 
+  el.queueList.querySelectorAll('.q-play').forEach((b) =>
+    b.addEventListener('click', () => window.triggerPlayOrQueue({ track: qList[Number(b.dataset.idx)] }, 'now'))
+  );
   el.queueList.querySelectorAll('.q-remove').forEach((b) =>
-    b.addEventListener('click', () => fetch(`/api/queue/${b.dataset.idx}`, { method: 'DELETE' }))
+    b.addEventListener('click', async () => {
+      const res = await fetch(`/api/queue/${b.dataset.idx}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.state) renderState(data.state);
+    })
   );
 
   el.historyList.innerHTML = (s.history || []).map((t, idx) => `
@@ -211,6 +231,19 @@ function renderState(s) {
   document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === s.vibeMode));
   document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.engine === s.vibeEngineSource));
 }
+window.renderState = renderState;
+
+fetch('/api/nowplaying').then((r) => r.json()).then(renderState).catch(() => {});
+setInterval(() => {
+  const s = window.currentShow;
+  if (s && s.isPlaying && !s.isPaused && s.nowPlaying) {
+    s.elapsed = Math.min(s.nowPlaying.duration || 999, (s.elapsed || 0) + 1);
+    window.el.elapsedTime.textContent = window.formatSecs(s.elapsed);
+    if (s.nowPlaying.duration > 0) {
+      window.el.progressFill.style.width = `${Math.min(100, (s.elapsed / s.nowPlaying.duration) * 100)}%`;
+    }
+  }
+}, 1000);
 
 const evtSource = new EventSource('/api/events');
 evtSource.addEventListener('state', (e) => {

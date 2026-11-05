@@ -1,6 +1,6 @@
 /**
  * @file bot/playerUi.ts
- * @description Clean Discord Now Playing Embed & Interactive Control Buttons.
+ * @description Clean Discord Now Playing Studio Embed & Interactive Control Buttons (2 Action Rows).
  */
 
 import {
@@ -16,8 +16,8 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
   if (!track) {
     const idleEmbed = new EmbedBuilder()
       .setColor(0x7c3aed)
-      .setTitle('📻 OWRadio — Ready')
-      .setDescription('Use `/play` or the Web Dashboard to start streaming 100% real studio audio.');
+      .setTitle('📻 OWRadio Studio — Ready')
+      .setDescription('Use `/play`, `/charts`, or the Web Studio Dashboard (`http://localhost:8091`) to start streaming 100% real studio audio.');
     return { embeds: [idleEmbed], components: [] };
   }
 
@@ -42,7 +42,10 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
   ].filter(Boolean);
 
   if (player.deck2Track) {
-    lines.push(`\n**Deck 2 (Ready):** ${player.deck2Track.artist} — *${player.deck2Track.title}*`);
+    lines.push(`\n**⚡ Deck 2 (Ready):** ${player.deck2Track.artist} — *${player.deck2Track.title}*`);
+  }
+  if (player.deck3Track) {
+    lines.push(`**🎯 Deck 3 (Cued):** ${player.deck3Track.artist} — *${player.deck3Track.title}*`);
   }
 
   const embed = new EmbedBuilder()
@@ -50,14 +53,14 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
     .setTitle(`🎶 ${track.title}`.slice(0, 250))
     .setDescription(lines.join('\n').slice(0, 4000))
     .setFooter({
-      text: `Mode: ${player.vibeMode.toUpperCase()} | Engine: ${player.vibeEngineSource.toUpperCase()} | Queue: ${player.queue.length} | Vol: ${player.broadcastTee.getVolumePercent()}%`,
+      text: `Vibe: ${player.vibeMode.toUpperCase()} • Source: ${player.vibeEngineSource.toUpperCase()} • Autoplay: ${player.autoplay ? 'ON' : 'OFF'} • Loop: ${player.loopMode.toUpperCase()} • Vol: ${player.broadcastTee.getVolumePercent()}%`,
     });
 
   if (track.artworkUrl && track.artworkUrl.startsWith('http')) {
     embed.setThumbnail(track.artworkUrl);
   }
 
-  const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
+  const row1 = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId('owr_pause_resume')
       .setLabel(player.isPaused ? 'Resume' : 'Pause')
@@ -75,7 +78,7 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
       .setStyle(ButtonStyle.Danger),
     new ButtonBuilder()
       .setCustomId('owr_like')
-      .setLabel('Love Vibe')
+      .setLabel('Lock Vibe')
       .setEmoji('👍')
       .setStyle(ButtonStyle.Secondary),
     new ButtonBuilder()
@@ -85,5 +88,23 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
       .setStyle(ButtonStyle.Secondary)
   );
 
-  return { embeds: [embed], components: [row] };
+  const row2 = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId('owr_shuffle')
+      .setLabel('Shuffle Decks')
+      .setEmoji('🔀')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('owr_loop')
+      .setLabel(`Loop: ${player.loopMode.toUpperCase()}`)
+      .setEmoji('🔁')
+      .setStyle(player.loopMode !== 'off' ? ButtonStyle.Primary : ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('owr_autoplay')
+      .setLabel(`Autoplay: ${player.autoplay ? 'ON' : 'OFF'}`)
+      .setEmoji('🤖')
+      .setStyle(player.autoplay ? ButtonStyle.Success : ButtonStyle.Secondary)
+  );
+
+  return { embeds: [embed], components: [row1, row2] };
 }

@@ -220,9 +220,6 @@ app.post('/api/player/volume', async (c) => {
 
 app.post('/api/player/:action', async (c) => {
   const action = c.req.param('action');
-  if (['skip', 'stop', 'clear'].includes(action) && !checkAdmin(c)) {
-    return c.json({ error: 'Admin authentication required' }, 403);
-  }
   switch (action) {
     case 'pause': globalPlayer.pause(); break;
     case 'resume': globalPlayer.resume(); break;
@@ -234,9 +231,15 @@ app.post('/api/player/:action', async (c) => {
     case 'skip': globalPlayer.skip(); break;
     case 'stop': globalPlayer.stop(); break;
     case 'shuffle':
-      for (let i = globalPlayer.queue.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [globalPlayer.queue[i], globalPlayer.queue[j]] = [globalPlayer.queue[j], globalPlayer.queue[i]];
+      if (globalPlayer.queue.length > 1) {
+        for (let i = globalPlayer.queue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [globalPlayer.queue[i], globalPlayer.queue[j]] = [globalPlayer.queue[j], globalPlayer.queue[i]];
+        }
+      } else {
+        globalPlayer.deck2Track = null;
+        globalPlayer.deck3Track = null;
+        if (globalPlayer.isPlaying) void globalPlayer.prewarmDecks();
       }
       globalPlayer.emitStateUpdate();
       break;
@@ -250,6 +253,7 @@ app.post('/api/player/:action', async (c) => {
       globalPlayer.deck2Track = null;
       globalPlayer.deck3Track = null;
       globalPlayer.emitStateUpdate();
+      if (globalPlayer.isPlaying && globalPlayer.autoplay) void globalPlayer.prewarmDecks();
       break;
     case 'like': globalPlayer.voteCurrentTrack('up'); break;
     case 'dislike': globalPlayer.voteCurrentTrack('down'); break;
@@ -260,8 +264,18 @@ app.post('/api/player/:action', async (c) => {
 
 app.delete('/api/queue/:index', (c) => {
   const idx = parseInt(c.req.param('index'), 10);
-  if (!Number.isNaN(idx) && idx >= 0 && idx < globalPlayer.queue.length) {
-    globalPlayer.queue.splice(idx, 1);
+  if (!Number.isNaN(idx) && idx >= 0) {
+    if (globalPlayer.queue.length > 0 && idx < globalPlayer.queue.length) {
+      globalPlayer.queue.splice(idx, 1);
+    } else if (globalPlayer.queue.length === 0) {
+      if (idx === 0) {
+        globalPlayer.deck2Track = globalPlayer.deck3Track;
+        globalPlayer.deck3Track = null;
+      } else if (idx === 1) {
+        globalPlayer.deck3Track = null;
+      }
+      if (globalPlayer.isPlaying) void globalPlayer.prewarmDecks();
+    }
     globalPlayer.emitStateUpdate();
   }
   return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
