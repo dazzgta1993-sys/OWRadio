@@ -244,6 +244,12 @@ export function isTrackAllowedByQualityFilters(title: string, artistName: string
   if (nonMusicRegex.test(combined)) {
     return false;
   }
+  // Anti-Junk Shield: reject type beats, sped up / slowed edits, earrape, meme audio
+  const isJunkFilter = /\b(type beat|hoodtrap|sped up|slowed \+ reverb|slowed and reverb|nightcore|earrape|tiktok remix|tik tok remix|meme remix|bass boosted|8d audio|phonk remix|meme|soundboard)\b/i;
+  if (isJunkFilter.test(combined)) {
+    return false;
+  }
+
 
   return true;
 }
@@ -482,176 +488,79 @@ function getRecentPlaybackTitles(limit = 8): string[] {
 }
 
 /**
- * Dynamic Anti-Bubble Fallback Walk (used when LLM is offline or returns fewer than required tracks).
- * NEVER returns a static hardcoded track list.
+ * Harmonic DJ Autoplay Generator:
+ * Chains seamlessly from the active track's artist and genre, exactly like a human DJ set.
+ * No sudden genre switches, no genre roulette.
  */
-async function getDynamicFallbackTrack(
-  roomProfile: RoomTasteProfile,
+async function getHarmonicDJTrack(
+  anchorArtist: string,
   queuedSongIds: Set<string>,
   queuedArtists: Set<string>,
   queuedDedupeKeys: Set<string> = new Set(),
   queuedLanguages: Set<string> = new Set()
 ): Promise<CuratedTrackResult | null> {
-  const hasSeeds = roomProfile.topLikedArtists.length > 0;
-  const rand = Math.random();
+  const normAnchor = anchorArtist.trim();
+  if (!normAnchor) return null;
 
-  // --- Bucket 1: Core Taste Anchor (20%) ---
-  if (hasSeeds && rand < 0.20) {
-    const seedArtist = roomProfile.topLikedArtists[Math.floor(Math.random() * roomProfile.topLikedArtists.length)];
-    try {
-      const artist = await deezer.searchArtist(seedArtist);
-      const artistId = artist?.id;
-      if (artistId) {
-        const topTracks = await deezer.getArtistTopTracks(artistId, 15);
+  try {
+    // 1. Harmonic Chain: Find 1st-degree musically related artists in the exact same genre/world
+    const related = await collaborativeGraph.getRelatedArtists(normAnchor, 15);
+    const candidateArtistNames = related
+      .map((r: { name: string }) => r.name)
+      .filter((name: string) => {
+        const lower = name.toLowerCase();
+        if (queuedArtists.has(lower)) return false;
+        if (vetoService.isArtistVetoed(name)) return false;
+        return true;
+      });
+
+    if (candidateArtistNames.length > 0) {
+      // Pick from related artists' best catalog tracks
+      const deepCuts = await collaborativeGraph.getDeepCutsForArtists(candidateArtistNames.slice(0, 8), 5, 2);
+      const shuffled = fisherYatesShuffle(deepCuts);
+
+      for (const track of shuffled) {
+        if (await isCandidateEligibleAsync(track, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
+          return {
+            track,
+            curatedBy: 'DJ Harmonic Chain',
+            curationReason: `Harmonic match branched from ${normAnchor}`,
+          };
+        }
+      }
+    }
+
+    // 2. Artist Deep-Cut Fallback: Top studio track by the same artist (if not in cooldown)
+    if (!queuedArtists.has(normAnchor.toLowerCase()) && !vetoService.isArtistVetoed(normAnchor)) {
+      const artist = await deezer.searchArtist(normAnchor);
+      if (artist?.id) {
+        const topTracks = await deezer.getArtistTopTracks(artist.id, 20);
         for (const track of topTracks) {
           if (await isCandidateEligibleAsync(track, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
             return {
               track,
-              curatedBy: 'Dynamic Taste Deep-Cut',
-              curationReason: `Core taste anchor: ${seedArtist}`,
+              curatedBy: 'DJ Artist Deep-Cut',
+              curationReason: `Deep catalog cut from ${normAnchor}`,
             };
           }
         }
       }
-    } catch (err) {
-      console.warn('[Curator] Core anchor selection error:', (err as Error).message);
-    }
-  }
-
-  // --- Bucket 2: 1st-Degree Collaborative Deep-Cuts (50%) ---
-  if (hasSeeds && rand < 0.70) {
-    const seedArtist = roomProfile.topLikedArtists[Math.floor(Math.random() * roomProfile.topLikedArtists.length)];
-    try {
-      const related = await collaborativeGraph.getRelatedArtists(seedArtist, 8);
-      const relatedNames = related.map((r) => r.name);
-      if (relatedNames.length > 0) {
-        const deepCuts = await collaborativeGraph.getDeepCutsForArtists(relatedNames, 5, 3);
-        const shuffled = fisherYatesShuffle(deepCuts);
-        for (const track of shuffled) {
-          if (await isCandidateEligibleAsync(track, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
-            return {
-              track,
-              curatedBy: 'Dynamic Taste Deep-Cut',
-              curationReason: `Collaborative b-side branched from ${seedArtist}`,
-            };
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('[Curator] Collaborative deep-cut error:', (err as Error).message);
-    }
-  }
-
-  // --- Bucket 3: Preferred Genre Discovery or Vintage Circadian Vault (30%) ---
-  try {
-    const hasGenres = roomProfile.topLikedGenres && roomProfile.topLikedGenres.length > 0;
-    // When listeners have active genre preferences, prioritize them with 70% probability
-    const pickPreferredGenre = hasGenres && (Math.random() < 0.70 || !hasSeeds);
-
-    let candidates: DeezerTrackMetadata[] = [];
-    let reason = '';
-    let curatedBy: CuratedTrackResult['curatedBy'] = 'Dynamic Era Roulette';
-
-    if (pickPreferredGenre && roomProfile.topLikedGenres.length > 0) {
-      const rawGenre = roomProfile.topLikedGenres[Math.floor(Math.random() * roomProfile.topLikedGenres.length)];
-      const normGenre = rawGenre.toLowerCase().trim();
-      const chartId = GENRE_CHART_MAP[normGenre];
-      if (chartId) {
-        candidates = await deezer.getRandomChartTracks(chartId, 40);
-      } else {
-        candidates = await deezer.searchTracks(`${rawGenre} hits classics`, 35);
-      }
-      reason = `Room genre preference: ${rawGenre.toUpperCase()}`;
-      curatedBy = 'Dynamic Genre Explorer';
-    } else {
-      const rollType = Math.random() < 0.5 ? 'genre' : 'year';
-      if (rollType === 'genre') {
-        const genreId = FALLBACK_GENRE_IDS[Math.floor(Math.random() * FALLBACK_GENRE_IDS.length)];
-        candidates = await deezer.getRandomChartTracks(genreId, 40);
-        reason = 'Dynamic genre roulette exploration';
-      } else {
-        // Curate authentic vintage era without querying literal keyword "years"
-        const vintageThemes = [
-          { query: '70s classic rock hits', name: '70s Classic Rock' },
-          { query: '70s soul funk classics', name: '70s Soul & Funk' },
-          { query: '80s new wave synthpop', name: '80s Synthpop & New Wave' },
-          { query: '80s classic pop anthems', name: '80s Pop Vault' },
-          { query: '90s alternative rock', name: '90s Alternative' },
-          { query: '90s grunge classics', name: '90s Grunge' },
-          { query: '90s trip hop chill', name: '90s Trip Hop' },
-          { query: '2000s indie rock', name: '2000s Indie' },
-          { query: '2000s electronic classic', name: '2000s Electronic' },
-          { query: '2010s indie pop hits', name: '2010s Indie Pop' },
-        ];
-        const theme = vintageThemes[Math.floor(Math.random() * vintageThemes.length)];
-        candidates = await deezer.searchTracksRandomized(theme.query, 40, 200);
-        reason = `Dynamic vintage vault (${theme.name})`;
-      }
     }
 
-    const shuffled = fisherYatesShuffle(candidates);
-    for (const track of shuffled) {
+    // 3. Collaborative features and releases with anchor artist
+    const collabTracks = await deezer.searchTracks(normAnchor, 25);
+    const shuffledCollabs = fisherYatesShuffle(collabTracks);
+    for (const track of shuffledCollabs) {
       if (await isCandidateEligibleAsync(track, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
         return {
           track,
-          curatedBy,
-          curationReason: reason,
+          curatedBy: 'DJ Collaborative Vibe',
+          curationReason: `Collaborative track with ${normAnchor}`,
         };
       }
     }
   } catch (err) {
-    console.warn('[Curator] Dynamic roulette fallback error:', (err as Error).message);
-  }
-
-  // Last resort Deezer charts
-  const englishGenreChartIds = [132, 152, 116, 165, 85]; // Pop, Rock, Rap, R&B, Alternative
-  const selectedGenre = englishGenreChartIds[Math.floor(Math.random() * englishGenreChartIds.length)];
-  const charts = await deezer.getRandomChartTracks(selectedGenre, 50);
-  const shuffledCharts = fisherYatesShuffle(charts);
-  for (const track of shuffledCharts) {
-    if (await isCandidateEligibleAsync(track, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
-      return {
-        track,
-        curatedBy: 'Dynamic Era Roulette',
-        curationReason: 'General eclectic discovery',
-      };
-    }
-  }
-
-  // --- Tier 4: Local SQLite Catalog Safety Net (Anti-Fatigue Bucket) ---
-  try {
-    const localCandidates = sqlite.prepare(`
-      SELECT s.*,
-        (SELECT COUNT(*) FROM playback_history h WHERE h.song_id = s.id) as play_count,
-        (SELECT MAX(played_at) FROM playback_history h WHERE h.song_id = s.id) as last_played
-      FROM songs s
-      ORDER BY play_count ASC, last_played ASC, RANDOM()
-      LIMIT 50
-    `).all() as any[];
-
-    for (const row of localCandidates) {
-      if (await isCandidateEligibleAsync({ id: row.id, artist: row.artist, title: row.title, album: row.album, durationSec: row.duration_sec }, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
-        const metadata: DeezerTrackMetadata = {
-          id: row.id,
-          deezerId: row.deezer_id || row.id.replace(/^dz_/, ''),
-          title: row.title,
-          artist: row.artist,
-          album: row.album || undefined,
-          durationSec: row.duration_sec || 180,
-          artworkUrl: row.artwork_url || '',
-          artworkThumbUrl: row.artwork_thumb_url || '',
-          genre: row.genre || undefined,
-          releaseYear: row.release_year || undefined,
-        };
-        return {
-          track: metadata,
-          curatedBy: 'Dynamic Taste Deep-Cut',
-          curationReason: row.play_count === 0 ? 'Local Catalog: Unplayed Deep Discovery' : 'Local Catalog: Anti-Fatigue Vault Selection',
-        };
-      }
-    }
-  } catch (err) {
-    console.warn('[Curator] Local catalog fallback error:', (err as Error).message);
+    console.warn('[Curator] Harmonic DJ track error:', (err as Error).message);
   }
 
   return null;
@@ -659,18 +568,17 @@ async function getDynamicFallbackTrack(
 
 /**
  * Main Autoplay Pipeline: Generates the next N curated tracks respecting 48h/2h anti-repetition rules.
+ * Maintains harmonic DJ continuity from the currently playing anchor track.
  */
 export async function getNextAutoplayTracks(
   memberUserIds: string[],
   count = 2,
   existingQueueSongIds: string[] = [],
   existingQueueArtists: string[] = [],
-  existingQueueTitles: string[] = []
+  existingQueueTitles: string[] = [],
+  anchorTrack?: { id: string; title: string; artist: string } | null
 ): Promise<CuratedTrackResult[]> {
   const roomProfile = getActiveVoiceRoomProfile(memberUserIds);
-  const recentTracks = getRecentPlaybackTitles(8);
-  const randomSeedEra = SEED_ERAS[Math.floor(Math.random() * SEED_ERAS.length)];
-
   const queuedSongIds = new Set(existingQueueSongIds);
   const queuedArtists = new Set<string>();
   for (const a of existingQueueArtists) {
@@ -687,154 +595,96 @@ export async function getNextAutoplayTracks(
   }
 
   const queuedLanguages = new Set<string>();
-  for (let i = 0; i < existingQueueTitles.length; i++) {
-    const t = existingQueueTitles[i];
-    const a = existingQueueArtists[i] || '';
-    if (t && a) {
-      const l = 'en';
-      if (l !== 'en') queuedLanguages.add(l);
-    }
-  }
-
   const results: CuratedTrackResult[] = [];
 
-  // --- Tier 0: Grounded Time Capsule (Strict Record Release Dates, Zero LLM Hallucination) ---
-  const timeCapsuleYear = featureFlags.isEnabled('feature_time_capsule')
-    ? stationCurator.getTimeCapsuleYear()
-    : null;
+  // Determine active DJ Vibe Anchor:
+  // 1. Explicitly passed anchor track (currently playing track or queue tail)
+  // 2. Last played track in playback history
+  // 3. Room liked artists or baseline scaffold
+  let activeAnchor = (anchorTrack?.artist || '').trim();
 
-  if (timeCapsuleYear) {
-    try {
-      const tcTracks = await stationCurator.getNextTimeCapsuleTracks(
-        count,
-        queuedSongIds,
-        queuedArtists
-      );
-      for (const track of tcTracks) {
-        if (isTrackEligibleForAutoplay(track.id, track.artist, queuedSongIds, queuedArtists, track.title, queuedDedupeKeys, track.durationSec, queuedLanguages, (track as any).isrc)) {
-          queuedSongIds.add(track.id);
-          queuedArtists.add(track.artist.toLowerCase());
-          const normA = normalizeArtist(track.artist).replace(/\s+/g, '');
-          if (normA) queuedArtists.add(normA);
-          queuedDedupeKeys.add(getTrackDedupeKey(track.title, track.artist));
-          const lang = 'en';
-          if (lang !== 'en') queuedLanguages.add(lang);
-          results.push({
-            track,
-            curatedBy: 'Dynamic Era Roulette',
-            curationReason: `Grounded verified record release from ${timeCapsuleYear}`,
-          });
-        }
-      }
-
-      if (results.length >= count) {
-        return results;
-      }
-    } catch (err) {
-      console.warn('[Curator] Grounded time capsule tier error:', (err as Error).message);
+  if (!activeAnchor) {
+    const recent = getRecentPlaybackTitles(1);
+    if (recent.length > 0) {
+      const parts = recent[0].split(' - ');
+      if (parts[0]) activeAnchor = parts[0].trim();
     }
-  }  // --- Tier 1: Curation Pipeline based on active Engine (hybrid / embedding / jev / llm) ---
-  if (currentEngine === 'hybrid') {
-    // Primary Hybrid Mode: 20/50/30 Degrees of Separation Collaborative Graph (Last.fm + Deezer)
-    let hybridAttempts = 0;
-    while (results.length < count && hybridAttempts < 8) {
-      hybridAttempts++;
-      const collTrack = await getDynamicFallbackTrack(roomProfile, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages);
-      if (collTrack) {
-        queuedSongIds.add(collTrack.track.id);
-        queuedArtists.add(collTrack.track.artist.toLowerCase());
-        const normA = normalizeArtist(collTrack.track.artist).replace(/\s+/g, '');
-        if (normA) queuedArtists.add(normA);
-        queuedDedupeKeys.add(getTrackDedupeKey(collTrack.track.title, collTrack.track.artist));
-        const lang = 'en';
-        if (lang !== 'en') queuedLanguages.add(lang);
-        results.push(collTrack);
-      }
-    }
-  } else if (currentEngine === 'embedding') {    }
-
-  // --- MusicBrainz & Deezer Discography Discovery (if slots remain) ---
-  if (results.length < count && roomProfile.topLikedArtists.length > 0) {
-    try {
-      const seedArtist = roomProfile.topLikedArtists[Math.floor(Math.random() * roomProfile.topLikedArtists.length)];
-      const mbRecordings = await musicbrainz.getArtistTopRecordings(seedArtist, 5);
-      for (const rec of mbRecordings) {
-        if (results.length >= count) break;
-        const candidates = await deezer.searchTracks(`${rec.artist} ${rec.title}`, 2);
-        for (const candidate of candidates) {
-          if (await isCandidateEligibleAsync(candidate, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
-            queuedSongIds.add(candidate.id);
-            queuedArtists.add(candidate.artist.toLowerCase());
-            const normA = normalizeArtist(candidate.artist).replace(/\s+/g, '');
-            if (normA) queuedArtists.add(normA);
-            queuedDedupeKeys.add(getTrackDedupeKey(candidate.title, candidate.artist));
-            results.push({
-              track: candidate,
-              curatedBy: 'MusicBrainz & Deezer Discovery',
-              curationReason: `Official discography recommendation for ${seedArtist}`,
-            });
-            break;
-          }
-        }
-      }
-    } catch {}
   }
 
-  // --- Tier 2: Dynamic Anti-Bubble Fallback ---
-    let tier2Attempts = 0;
-  while (results.length < count && tier2Attempts < 8) {
-    tier2Attempts++;
-    const fallbackResult = await getDynamicFallbackTrack(roomProfile, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages);
-    if (!fallbackResult) {
-      continue;
+  if (!activeAnchor) {
+    if (roomProfile.topLikedArtists.length > 0) {
+      activeAnchor = roomProfile.topLikedArtists[0];
+    } else {
+      const baseline = baselineService.getBaseline();
+      activeAnchor = baseline.artists[0] || 'Dua Lipa';
     }
-    queuedSongIds.add(fallbackResult.track.id);
-    queuedArtists.add(fallbackResult.track.artist.toLowerCase());
-    const normA = normalizeArtist(fallbackResult.track.artist).replace(/\s+/g, '');
-    if (normA) queuedArtists.add(normA);
-    queuedDedupeKeys.add(getTrackDedupeKey(fallbackResult.track.title, fallbackResult.track.artist));
-    const lang = 'en';
-    if (lang !== 'en') queuedLanguages.add(lang);
-    results.push(fallbackResult);
+  }
 
+  // Tier 1: Harmonic DJ Chaining (chains smoothly from track to track)
+  let djAttempts = 0;
+  while (results.length < count && djAttempts < 12) {
+    djAttempts++;
+    const djResult = await getHarmonicDJTrack(activeAnchor, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages);
+    if (djResult) {
+      queuedSongIds.add(djResult.track.id);
+      queuedArtists.add(djResult.track.artist.toLowerCase());
+      const normA = normalizeArtist(djResult.track.artist).replace(/\s+/g, '');
+      if (normA) queuedArtists.add(normA);
+      queuedDedupeKeys.add(getTrackDedupeKey(djResult.track.title, djResult.track.artist));
+      results.push(djResult);
+
+      // HARMONIC CHAIN: Step forward to this new track's artist for the next song!
+      activeAnchor = djResult.track.artist;
+    } else {
+      // If activeAnchor is exhausted, try fallback to a room liked artist or baseline
+      if (roomProfile.topLikedArtists.length > 0) {
+        const nextSeed = roomProfile.topLikedArtists.find((a: string) => !queuedArtists.has(a.toLowerCase()));
+        if (nextSeed) {
+          activeAnchor = nextSeed;
+          continue;
+        }
       }
+      break;
+    }
+  }
 
-  // --- Tier 5: Emergency Dead-Air Prevention (Progressive Softening) ---
+  // Tier 2: Emergency Dead-Air Prevention (Local Catalog Safety Net)
   if (results.length < count) {
-    console.warn('[Curator] ⚠️ Tight cooldowns detected. Activating Emergency Anti-Fatigue Vault to guarantee zero dead air.');
     try {
-      const emergencyTracks = sqlite.prepare(`
+      const localCandidates = sqlite.prepare(`
         SELECT s.*,
           (SELECT COUNT(*) FROM playback_history h WHERE h.song_id = s.id) as play_count,
           (SELECT MAX(played_at) FROM playback_history h WHERE h.song_id = s.id) as last_played
         FROM songs s
-        ORDER BY play_count ASC, last_played ASC
-        LIMIT 10
+        ORDER BY play_count ASC, last_played ASC, RANDOM()
+        LIMIT 30
       `).all() as any[];
 
-      for (const row of emergencyTracks) {
+      for (const row of localCandidates) {
         if (results.length >= count) break;
-        if (queuedSongIds.has(row.id)) continue;
-        const normA = normalizeArtist(row.artist).replace(/\s+/g, '');
-        if (queuedArtists.has(row.artist.toLowerCase()) || (normA && queuedArtists.has(normA))) continue;
-
-        queuedSongIds.add(row.id);
-        queuedArtists.add(row.artist.toLowerCase());
-        results.push({
-          track: {
-            id: row.id,
-            deezerId: row.deezer_id || row.id.replace(/^dz_/, ''),
-            title: row.title,
-            artist: row.artist,
-            album: row.album || undefined,
-            durationSec: row.duration_sec || 180,
-            artworkUrl: row.artwork_url || '',
-            artworkThumbUrl: row.artwork_thumb_url || '',
-            releaseYear: row.release_year || undefined,
-          },
-          curatedBy: 'Dynamic Taste Deep-Cut',
-          curationReason: 'Emergency Vault: Longest-rested library track',
-        });
+        if (await isCandidateEligibleAsync({ id: row.id, artist: row.artist, title: row.title, album: row.album, durationSec: row.duration_sec }, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
+          queuedSongIds.add(row.id);
+          queuedArtists.add(row.artist.toLowerCase());
+          const normA = normalizeArtist(row.artist).replace(/\s+/g, '');
+          if (normA) queuedArtists.add(normA);
+          queuedDedupeKeys.add(getTrackDedupeKey(row.title, row.artist));
+          results.push({
+            track: {
+              id: row.id,
+              deezerId: row.deezer_id || row.id.replace(/^dz_/, ''),
+              title: row.title,
+              artist: row.artist,
+              album: row.album || undefined,
+              durationSec: row.duration_sec || 180,
+              artworkUrl: row.artwork_url || '',
+              artworkThumbUrl: row.artwork_thumb_url || '',
+              genre: row.genre || undefined,
+              releaseYear: row.release_year || undefined,
+            },
+            curatedBy: 'DJ Harmonic Chain',
+            curationReason: 'Station Catalog Continuity',
+          });
+        }
       }
     } catch (err) {
       console.warn('[Curator] Emergency fallback error:', (err as Error).message);

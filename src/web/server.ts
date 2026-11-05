@@ -777,7 +777,15 @@ export function createWebServer(player: GuildPlayer) {
     const activeEngine = curator.getEngine();
     let recommendations: any[] = [];
 
-    recommendations = await curator.getNextAutoplayTracks(activeUserIds, 3);
+    const currentTrack = player.currentTrack;
+    recommendations = await curator.getNextAutoplayTracks(
+      activeUserIds,
+      3,
+      [],
+      [],
+      [],
+      currentTrack ? { id: currentTrack.id, title: currentTrack.title, artist: currentTrack.artist } : null
+    );
 
     const durationMs = Math.round(performance.now() - t0);
     const latestInteraction = null;

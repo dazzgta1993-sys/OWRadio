@@ -1254,12 +1254,18 @@ export class GuildPlayer extends EventEmitter {
         ...this.queue.map((t) => t.title),
       ];
 
+      // Determine active Vibe Anchor: tail of upcoming queue or current track on deck
+      const anchorTrack = this.queue.length > 0 
+        ? this.queue[this.queue.length - 1] 
+        : this.currentTrack;
+
       const curatedResults = await curator.getNextAutoplayTracks(
         activeMemberIds,
         neededCount,
         existingIds,
         existingArtists,
-        existingTitles
+        existingTitles,
+        anchorTrack ? { id: anchorTrack.id, title: anchorTrack.title, artist: anchorTrack.artist } : null
       );
 
       for (const res of curatedResults) {
