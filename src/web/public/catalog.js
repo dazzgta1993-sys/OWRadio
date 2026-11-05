@@ -230,6 +230,28 @@ function renderState(s) {
 
   document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === s.vibeMode));
   document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.engine === s.vibeEngineSource));
+
+  const likedEl = document.getElementById('likedList');
+  const dislikedEl = document.getElementById('dislikedList');
+  if (likedEl && s.taste) {
+    const liked = s.taste.likedArtists || [];
+    likedEl.innerHTML = liked.length
+      ? liked.map((k) => `<span class="pill pill-live" style="display:inline-flex;align-items:center;gap:6px;">👍 ${window.escapeHtml(k)} <button class="taste-rm" data-key="${window.escapeHtml(k)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
+      : '<span style="font-size:12px;color:#9ca3af;">No locked vibes yet — click 👍 Lock Vibe on any track.</span>';
+  }
+  if (dislikedEl && s.taste) {
+    const blocked = [...(s.taste.dislikedArtists || []), ...(s.taste.dislikedTracks || [])];
+    dislikedEl.innerHTML = blocked.length
+      ? blocked.map((k) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">🚫 ${window.escapeHtml(k)} <button class="taste-rm" data-key="${window.escapeHtml(k)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
+      : '<span style="font-size:12px;color:#9ca3af;">No blocked artists or songs.</span>';
+  }
+  document.querySelectorAll('.taste-rm').forEach((b) =>
+    b.addEventListener('click', async () => {
+      const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) });
+      const data = await res.json();
+      if (data.state) renderState(data.state);
+    })
+  );
 }
 window.renderState = renderState;
 

@@ -21,6 +21,7 @@ import { extractPrimaryArtist, normalizeTrackKey } from '../utils/artistNormaliz
 import {
   savePlaybackHistory,
   recordTasteFeedback,
+  getTasteProfile,
   getRuntimeSetting,
   setRuntimeSetting,
 } from '../db/store.js';
@@ -218,50 +219,30 @@ export class GuildPlayer extends EventEmitter {
 
   public pause(): boolean {
     if (!this.isPlaying || this.isPaused) return false;
-    this.isPaused = true;
-    this.pauseStartTime = Date.now();
-    this.broadcastTee.setPaused(true);
-    this.audioPlayer.pause();
-    this.emitStateUpdate();
-    return true;
+    this.isPaused = true; this.pauseStartTime = Date.now();
+    this.broadcastTee.setPaused(true); this.audioPlayer.pause();
+    this.emitStateUpdate(); return true;
   }
 
   public resume(): boolean {
     if (!this.isPlaying || !this.isPaused) return false;
-    if (this.pauseStartTime > 0) {
-      this.totalPausedMs += Date.now() - this.pauseStartTime;
-      this.pauseStartTime = 0;
-    }
-    this.isPaused = false;
-    this.broadcastTee.setPaused(false);
-    this.audioPlayer.unpause();
-    this.emitStateUpdate();
-    return true;
+    if (this.pauseStartTime > 0) { this.totalPausedMs += Date.now() - this.pauseStartTime; this.pauseStartTime = 0; }
+    this.isPaused = false; this.broadcastTee.setPaused(false);
+    this.audioPlayer.unpause(); this.emitStateUpdate(); return true;
   }
 
   public skip(): void {
-    this.suppressIdleEvent = true;
-    this.broadcastTee.stopTrackStream();
-    void this.playNext(true);
+    this.suppressIdleEvent = true; this.broadcastTee.stopTrackStream(); void this.playNext(true);
   }
 
   public stop(): void {
-    this.suppressIdleEvent = true;
-    this.queue = [];
-    this.deck2Track = null;
-    this.deck3Track = null;
-    this.currentTrack = null;
-    this.isPlaying = false;
-    this.isPaused = false;
-    this.broadcastTee.stopTrackStream();
-    this.audioPlayer.stop(true);
-    this.emitStateUpdate();
+    this.suppressIdleEvent = true; this.queue = []; this.deck2Track = null; this.deck3Track = null;
+    this.currentTrack = null; this.isPlaying = false; this.isPaused = false;
+    this.broadcastTee.stopTrackStream(); this.audioPlayer.stop(true); this.emitStateUpdate();
   }
 
   public setVolume(volPercent: number): number {
-    this.broadcastTee.setVolume(volPercent);
-    this.emitStateUpdate();
-    return this.broadcastTee.getVolumePercent();
+    this.broadcastTee.setVolume(volPercent); this.emitStateUpdate(); return this.broadcastTee.getVolumePercent();
   }
 
   public setVibeConfig(mode?: VibeMode, engine?: VibeEngineSource): void {
@@ -275,14 +256,19 @@ export class GuildPlayer extends EventEmitter {
 
   public voteCurrentTrack(vote: 'up' | 'down'): void {
     if (!this.currentTrack) return;
-    recordTasteFeedback(this.currentTrack.artist, this.currentTrack.title, vote, this.guildId);
+    const art = extractPrimaryArtist(this.currentTrack.artist);
+    recordTasteFeedback(art, this.currentTrack.title, vote, this.guildId);
     if (vote === 'down') {
+      this.lastVibeDecision = `👎 Cooled & Blocked: ${art} — ${this.currentTrack.title}`;
+      console.log(`👎 [Taste] Cooled & Blocked: ${art} — ${this.currentTrack.title}`);
       this.deck2Track = null;
       this.deck3Track = null;
       this.skip();
     } else {
-      this.vibeAnchorArtist = extractPrimaryArtist(this.currentTrack.artist);
+      this.vibeAnchorArtist = art;
       this.vibeAnchorTrack = this.currentTrack;
+      this.lastVibeDecision = `👍 Vibe Locked: ${art} — ${this.currentTrack.title}`;
+      console.log(`👍 [Taste] Vibe Locked: ${art} — ${this.currentTrack.title}`);
       this.emitStateUpdate();
     }
   }
@@ -303,6 +289,7 @@ export class GuildPlayer extends EventEmitter {
       effectiveQueue.push(this.deck2Track);
       if (this.deck3Track) effectiveQueue.push(this.deck3Track);
     }
+    const tp = getTasteProfile(this.guildId);
     return {
       state: this.isPlaying ? (this.isPaused ? 'paused' : 'playing') : 'idle',
       isPlaying: this.isPlaying, isPaused: this.isPaused, autoplay: this.autoplay,
@@ -316,6 +303,11 @@ export class GuildPlayer extends EventEmitter {
       deck3: this.deck3Track ? this.deck3Track.toJSON() : null,
       queue: effectiveQueue.map((t) => t.toJSON()),
       history: this.history.slice(-25).reverse().map((t) => t.toJSON()),
+      taste: {
+        likedArtists: [...tp.likedArtists],
+        dislikedArtists: [...tp.dislikedArtists],
+        dislikedTracks: [...tp.dislikedTracks],
+      },
     };
   }
 

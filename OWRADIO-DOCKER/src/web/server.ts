@@ -20,6 +20,7 @@ import {
 import { getOfficialCharts, searchItunesTracks } from '../services/itunes.js';
 import { getDeezerChartTracks } from '../services/deezer.js';
 import { VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
+import { removeTasteFeedback } from '../db/store.js';
 import authService from './auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -286,6 +287,13 @@ app.post('/api/vibe', async (c) => {
   if (typeof body.autoplay === 'boolean') globalPlayer.autoplay = body.autoplay;
   globalPlayer.setVibeConfig(body.mode as VibeMode | undefined, body.engine as VibeEngineSource | undefined);
   if (globalPlayer.autoplay && !globalPlayer.isPlaying) void globalPlayer.playNext();
+  return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+});
+
+app.post('/api/taste/remove', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  if (body.key) removeTasteFeedback(String(body.key));
+  globalPlayer.emitStateUpdate();
   return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
 });
 

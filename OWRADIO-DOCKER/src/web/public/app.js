@@ -200,8 +200,16 @@ el.skipBtn.addEventListener('click', () => sendAction('skip'));
 el.stopBtn.addEventListener('click', () => sendAction('stop'));
 el.shuffleBtn.addEventListener('click', () => sendAction('shuffle'));
 el.loopBtn.addEventListener('click', () => sendAction('loop'));
-el.likeBtn.addEventListener('click', () => sendAction('like'));
-el.dislikeBtn.addEventListener('click', () => sendAction('dislike'));
+el.likeBtn.addEventListener('click', () => {
+  el.likeBtn.textContent = '✅ Vibe Locked!';
+  setTimeout(() => { el.likeBtn.textContent = '👍 Lock Vibe'; }, 1800);
+  sendAction('like');
+});
+el.dislikeBtn.addEventListener('click', () => {
+  el.dislikeBtn.textContent = '🚫 Blocked & Skipped!';
+  setTimeout(() => { el.dislikeBtn.textContent = '👎 Skip & Cool'; }, 1800);
+  sendAction('dislike');
+});
 el.clearQueueBtn.addEventListener('click', () => sendAction('clear'));
 if (el.autoplayBtn) {
   el.autoplayBtn.addEventListener('click', async () => {

@@ -205,6 +205,16 @@ export function getTasteProfile(guildId = 'global'): TasteProfile {
   return { likedArtists, dislikedArtists, dislikedTracks };
 }
 
+export function removeTasteFeedback(entityKey: string, guildId = 'global'): void {
+  const clean = (entityKey || '').trim().toLowerCase();
+  if (!clean) return;
+  try {
+    sqlite
+      .prepare('DELETE FROM taste_feedback WHERE guild_id = ? AND (entity_key = ? OR entity_key LIKE ?)')
+      .run(guildId, clean, `${clean} - %`);
+  } catch {}
+}
+
 export function getRuntimeSetting(key: string, defaultVal = ''): string {
   try {
     const row = sqlite.prepare('SELECT value FROM runtime_settings WHERE key = ?').get(key);
