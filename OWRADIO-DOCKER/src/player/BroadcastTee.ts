@@ -537,10 +537,10 @@ export class BroadcastTee extends EventEmitter {
 
       ytdlp.stderr.on('data', (errChunk: Buffer) => {
         const msg = errChunk.toString().trim();
-        if (msg && !msg.includes('Sleeping') && !msg.includes('%')) {
-          console.warn(`[BroadcastTee] yt-dlp stderr: ${msg}`);
-          channel.lastYtDlpError = msg;
-          this.lastYtDlpError = msg;
+        channel.lastYtDlpError = msg;
+        this.lastYtDlpError = msg;
+        if (msg.toLowerCase().includes('error:') && !msg.toLowerCase().includes('retrying')) {
+          console.warn(`[BroadcastTee] yt-dlp error: ${msg}`);
         }
       });
 
