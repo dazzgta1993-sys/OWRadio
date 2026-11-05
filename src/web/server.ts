@@ -271,6 +271,7 @@ app.post('/api/vibe', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.autoplay === 'boolean') globalPlayer.autoplay = body.autoplay;
   globalPlayer.setVibeConfig(body.mode as VibeMode | undefined, body.engine as VibeEngineSource | undefined);
+  if (globalPlayer.autoplay && !globalPlayer.isPlaying) void globalPlayer.playNext();
   return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
 });
 

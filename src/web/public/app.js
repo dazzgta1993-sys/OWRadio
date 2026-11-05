@@ -10,6 +10,7 @@ window.el = {
   playQueryBtn: document.getElementById('playQueryBtn'),
   queueQueryBtn: document.getElementById('queueQueryBtn'),
   searchDropdown: document.getElementById('searchResultsDropdown'),
+  autoplayBtn: document.getElementById('autoplayBtn'),
   anchorPill: document.getElementById('anchorPill'),
   sourceBadge: document.getElementById('sourceBadge'),
   nowPlayingArt: document.getElementById('nowPlayingArt'),
@@ -192,3 +193,9 @@ el.loopBtn.addEventListener('click', () => sendAction('loop'));
 el.likeBtn.addEventListener('click', () => sendAction('like'));
 el.dislikeBtn.addEventListener('click', () => sendAction('dislike'));
 el.clearQueueBtn.addEventListener('click', () => sendAction('clear'));
+if (el.autoplayBtn) {
+  el.autoplayBtn.addEventListener('click', () => {
+    const nextVal = !(window.currentShow && window.currentShow.autoplay !== false);
+    fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoplay: nextVal }) });
+  });
+}

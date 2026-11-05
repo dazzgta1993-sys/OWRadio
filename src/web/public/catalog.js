@@ -123,7 +123,11 @@ document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((btn) =>
 // --- Render Live State ---
 function renderState(s) {
   if (!s) return;
+  window.currentShow = s;
   const el = window.el;
+  if (el.autoplayBtn) {
+    el.autoplayBtn.textContent = s.autoplay !== false ? '🤖 Autoplay: ON' : '🤖 Autoplay: OFF';
+  }
   el.anchorPill.textContent = `⚓ Anchor: ${s.vibeAnchorArtist || 'Auto'}`;
   el.playPauseBtn.textContent = s.isPlaying && !s.isPaused ? '⏸' : '▶';
   el.loopBtn.classList.toggle('active', s.loopMode && s.loopMode !== 'off');
