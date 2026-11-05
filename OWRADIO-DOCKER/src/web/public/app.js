@@ -55,6 +55,7 @@
     btnBrowserAudio: document.getElementById('btnBrowserAudio'),
     browserAudioLabel: document.getElementById('browserAudioLabel'),
     browserAudioElement: document.getElementById('browserAudioElement'),
+    volIcon: document.getElementById('volIcon'),
     volSlider: document.getElementById('volSlider'),
     volPct: document.getElementById('volPct'),
 
@@ -162,10 +163,35 @@
     sendPlayerAction(isPlaying ? 'pause' : 'resume');
   };
 
+  let isVolumeDragging = false;
+  if (el.volSlider) {
+    el.volSlider.addEventListener('mousedown', () => { isVolumeDragging = true; });
+    el.volSlider.addEventListener('mouseup', () => { isVolumeDragging = false; });
+    el.volSlider.addEventListener('touchstart', () => { isVolumeDragging = true; }, { passive: true });
+    el.volSlider.addEventListener('touchend', () => { isVolumeDragging = false; });
+  }
+
   window.onVolumeChange = async function (val) {
-    const volume = parseInt(val, 10);
-    if (el.volPct) el.volPct.textContent = `${volume}%`;
+    const volume = Math.max(0, Math.min(100, parseInt(val, 10) || 0));
     currentState.volume = volume;
+
+    if (el.volPct) el.volPct.textContent = `${volume}%`;
+    if (el.volSlider && el.volSlider.value != volume) el.volSlider.value = volume;
+
+    // Direct HTML5 live stream volume control in listener's browser!
+    if (el.browserAudioElement) {
+      el.browserAudioElement.volume = volume / 100;
+    }
+
+    if (el.volIcon) {
+      el.volIcon.textContent = volume === 0 ? '🔇' : (volume < 50 ? '🔉' : '🔊');
+    }
+
+    try {
+      localStorage.setItem('owradio_volume', String(volume));
+    } catch {}
+
+    // Synchronize to backend server volume
     try {
       await fetch('/api/player/volume', {
         method: 'POST',
@@ -182,8 +208,9 @@
       if (el.volSlider) el.volSlider.value = 0;
       onVolumeChange(0);
     } else {
-      if (el.volSlider) el.volSlider.value = lastUnmutedVolume || 80;
-      onVolumeChange(lastUnmutedVolume || 80);
+      const restore = lastUnmutedVolume || 80;
+      if (el.volSlider) el.volSlider.value = restore;
+      onVolumeChange(restore);
     }
   };
 
@@ -201,6 +228,7 @@
       showToast('🔇 Local browser audio muted');
     } else {
       audio.src = '/stream.mp3?t=' + Date.now();
+      audio.volume = Math.max(0, Math.min(1, (currentState.volume !== undefined ? currentState.volume : 80) / 100));
       audio
         .play()
         .then(() => {
@@ -358,10 +386,17 @@
     currentState.state = data.state || 'idle';
     currentState.track = data.track || null;
     currentState.upNext = data.upNext || null;
-    if (typeof data.volume === 'number') {
-      currentState.volume = data.volume;
-      if (el.volSlider) el.volSlider.value = data.volume;
-      if (el.volPct) el.volPct.textContent = `${data.volume}%`;
+    if (typeof data.volume === 'number' && !isVolumeDragging && document.activeElement !== el.volSlider) {
+      const hasCustomLocal = localStorage.getItem('owradio_volume') !== null;
+      if (!hasCustomLocal) {
+        currentState.volume = data.volume;
+        if (el.volSlider) el.volSlider.value = data.volume;
+        if (el.volPct) el.volPct.textContent = `${data.volume}%`;
+        if (el.browserAudioElement) el.browserAudioElement.volume = data.volume / 100;
+        if (el.volIcon) {
+          el.volIcon.textContent = data.volume === 0 ? '🔇' : (data.volume < 50 ? '🔉' : '🔊');
+        }
+      }
     }
 
     // Now Playing Track Meta
@@ -602,6 +637,21 @@
 
   // --- Initialization ---
   function init() {
+    // Restore saved listener volume
+    try {
+      const savedVol = localStorage.getItem('owradio_volume');
+      if (savedVol !== null) {
+        const v = Math.max(0, Math.min(100, parseInt(savedVol, 10)));
+        if (!isNaN(v)) {
+          currentState.volume = v;
+          if (el.volSlider) el.volSlider.value = v;
+          if (el.volPct) el.volPct.textContent = `${v}%`;
+          if (el.browserAudioElement) el.browserAudioElement.volume = v / 100;
+          if (el.volIcon) el.volIcon.textContent = v === 0 ? '🔇' : (v < 50 ? '🔉' : '🔊');
+        }
+      }
+    } catch {}
+
     checkAuthStatus();
     fetchStationData();
     startTicker();

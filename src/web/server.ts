@@ -634,6 +634,18 @@ export function createWebServer(player: GuildPlayer) {
     return c.json({ success: removed, target });
   });
 
+  // --- Dedicated Volume Control Endpoint (Placed before :action wildcard) ---
+  app.post('/api/player/volume', async (c) => {
+    const body = await c.req.json().catch(() => ({}));
+    if (typeof body.volume === 'number') {
+      const isAdmin = checkIsAdmin(c);
+      if (!authService.isAuthEnabled() || isAdmin) {
+        player.setVolume(body.volume);
+      }
+    }
+    return c.json({ success: true, volume: player.getVolume() });
+  });
+
   // --- 5. POST /api/player/:action ---
   app.post('/api/player/:action', requireAdminAuth, async (c) => {
     const action = c.req.param('action');
@@ -671,6 +683,7 @@ export function createWebServer(player: GuildPlayer) {
         return c.json({ error: `Unknown action: ${action}` }, 400);
     }
   });
+
 
   // --- 5b. GET /api/brain (Brain & LLM Telemetry) ---
   app.get('/api/brain', (c) => {
