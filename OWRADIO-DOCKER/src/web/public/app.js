@@ -28,7 +28,7 @@ let isBrowserAudioPlaying = false;
 let currentLevel = 1;
 let evtSource = null;
 let currentBrainData = null;
-let currentBrainSubTab = 'llm';
+let currentBrainSubTab = 'pref';
 let brainPollInterval = null;
 
 function formatTime(seconds) {
@@ -895,7 +895,7 @@ function formatCountdown(remainingSec) {
 
 function switchBrainSubTab(tab) {
   currentBrainSubTab = tab;
-  const tabs = ['llm', 'pref', 'cooldown', 'vetoes', 'room', 'baseline'];
+  const tabs = ['pref', 'cooldown', 'vetoes', 'room', 'baseline'];
   tabs.forEach((t) => {
     const btn = document.getElementById(`brain-tab-${t}`);
     const sec = document.getElementById(`brain-section-${t}`);

@@ -2350,22 +2350,9 @@
         </div>
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
           <!-- Multi-Engine Instant Switcher -->
-          <div class="engine-switcher-box">
-            <span class="engine-switcher-label">Engine:</span>
-            <div class="engine-btn-group">
-              <button id="engine-btn-embedding" class="engine-toggle-btn engine-embedding active" onclick="switchCurationEngine('embedding')">
-                ⚡ Vector Latent
-              </button>
-              <button id="engine-btn-jev" class="engine-toggle-btn engine-jev" onclick="switchCurationEngine('jev')">
-                🎯 Jev Decision
-              </button>
-              <button id="engine-btn-llm" class="engine-toggle-btn engine-llm" onclick="switchCurationEngine('llm')">
-                🤖 Autoregressive LLM
-              </button>
-              <button id="engine-btn-hybrid" class="engine-toggle-btn engine-hybrid" onclick="switchCurationEngine('hybrid')">
-                🔀 Hybrid
-              </button>
-            </div>
+          <div style="display: flex; align-items: center; gap: 8px; background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.35); padding: 6px 14px; border-radius: 9999px;">
+            <span style="font-size: 13px;">🎵</span>
+            <span style="font-size: 12px; font-weight: 700; color: #38bdf8;">Deezer + MusicBrainz + YouTube Music</span>
           </div>
 
           <button id="btn-test-chime" class="btn" onclick="triggerTestChime()" style="padding: 9px 14px; font-size: 13px;">
@@ -2509,10 +2496,7 @@
 
       <!-- Sub-navigation tabs within Level 3 -->
       <div class="brain-subnav">
-        <button id="brain-tab-llm" class="brain-tab-btn active" onclick="switchBrainSubTab('llm')">
-          🤖 LLM Prompts & Responses (<span id="brain-badge-interactions-count">0</span>)
-        </button>
-        <button id="brain-tab-pref" class="brain-tab-btn" onclick="switchBrainSubTab('pref')">
+        <button id="brain-tab-pref" class="brain-tab-btn active" onclick="switchBrainSubTab('pref')">
           ❤️ Taste & Preference Matrix (<span id="brain-badge-pref-count">0</span>)
         </button>
         <button id="brain-tab-cooldown" class="brain-tab-btn" onclick="switchBrainSubTab('cooldown')">
@@ -2529,35 +2513,8 @@
         </button>
       </div>
 
-      <!-- Brain Section 1: LLM Prompts & Responses Feed -->
-      <div id="brain-section-llm">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-          <div style="font-size: 14px; font-weight: 700; color: #fff;">
-            Recent Model Interactions (Newest First)
-          </div>
-          <div style="display: flex; gap: 8px;">
-            <select id="brain-filter-action" class="btn" style="padding: 6px 12px; font-size: 12px;" onchange="filterBrainInteractions()">
-              <option value="all">All Actions</option>
-              <option value="taste_radar">🛰️ Taste Radar (Catalog Expansion)</option>
-              <option value="jev_decision">🎯 Jev Decision Engine</option>
-              <option value="vector_curation">⚡ Vector Latent Search</option>
-              <option value="curation">🤖 LLM Curation (Autoplay)</option>
-              <option value="vibe">✨ Vibe Generator</option>
-              <option value="enrichment">🏷️ Metadata Enrichment</option>
-              <option value="tier2_fallback">🌿 Deezer Graph Fallbacks</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="brain-interactions-list">
-          <div style="text-align: center; padding: 40px; color: var(--text-muted);">
-            Loading AI Brain telemetry...
-          </div>
-        </div>
-      </div>
-
       <!-- Brain Section 2: Taste & Preference Matrix -->
-      <div id="brain-section-pref" style="display: none;">
+      <div id="brain-section-pref" style="display: block;">
         <!-- Formula Explainer Banner -->
         <div style="background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
           <div style="font-weight: 700; color: #a5b4fc; font-size: 13px; margin-bottom: 4px;">📐 Affinity Score Formula:</div>
@@ -2642,20 +2599,7 @@
             </div>
           </div>
 
-          <!-- Right: Foreign Language Cooldowns -->
-          <div class="card" style="padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <span style="font-size: 15px; font-weight: 700; color: #fff;">🌍 Foreign Language Cooldowns</span>
-              <span id="badge-language-cooldown-count" class="badge-tag">0 LOCKED</span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-              Station English Purity (99.9%): Max 1 foreign song per 24 hours station-wide. When a foreign track plays, all foreign songs are locked:
-            </p>
-            <div id="brain-cooldown-languages-list" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-              <div style="text-align: center; padding: 20px; color: var(--text-muted);">No foreign languages currently locked</div>
-            </div>
           </div>
-        </div>
       </div>
 
       <!-- Brain Section 5: Dedicated Vetoes & Blacklist Manager -->
@@ -2815,11 +2759,7 @@
               <input id="baseline-weight-slider" type="range" min="0.1" max="2.0" step="0.1" value="0.5" style="width: 100%;" oninput="document.getElementById('baseline-weight-val').innerText = this.value" onchange="saveBaselineWeight(this.value)" />
               <p style="color: var(--text-muted); font-size: 11px; margin: 4px 0 0 0;">Low (0.1–0.5) lets human likes instantly steer. High (1.5–2.0) keeps a stronger station format.</p>
             </div>
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                <span style="font-weight: 600; font-size: 13px; color: #cbd5e1;">Global Foreign Track Cooldown</span>
-                <span id="foreign-cooldown-val" style="font-weight: 700; font-size: 13px; color: #34d399;">24 Hours</span>
-              </div>
+            
               <input id="foreign-cooldown-slider" type="range" min="60" max="2880" step="60" value="1440" style="width: 100%;" oninput="document.getElementById('foreign-cooldown-val').innerText = (this.value / 60).toFixed(0) + ' Hours'" onchange="updateDynamicConfigSetting('curation_language_cooldown_minutes', Number(this.value))" />
               <p style="color: var(--text-muted); font-size: 11px; margin: 4px 0 0 0;">Strict 24h cooldown allows at most 1 rare foreign track per day for a 99.9% English audience.</p>
             </div>
@@ -2941,29 +2881,7 @@
           </div>
         </div>
 
-        <!-- Server Vault Audio Cache -->
-        <div class="settings-card">
-          <div class="settings-card-header">
-            <span class="settings-card-title">💾 Server Audio Vault Cache</span>
-            <span id="settings-vault-count-badge" class="badge-tag">0 TRACKS</span>
-          </div>
-          <p style="font-size: 12px; color: var(--text-muted);">
-            Instant 0.0s playback cache for frequently played tracks. Reduces yt-dlp latency and network bandwidth.
-          </p>
-          <div class="settings-list" style="margin-top: 6px;">
-            <div class="settings-row">
-              <span class="settings-label">Cached Tracks</span>
-              <span id="settings-vault-tracks" class="settings-val">--</span>
-            </div>
-            <div class="settings-row">
-              <span class="settings-label">Storage Used</span>
-              <span id="settings-vault-size" class="settings-val">-- MB</span>
-            </div>
-            <div class="settings-row">
-              <span class="settings-label">Max Capacity</span>
-              <span class="settings-val">100 Tracks / 2 GB</span>
-            </div>
-          </div>
+        
           <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
             <button class="btn" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;" onclick="clearVaultCache()">
               🗑️ Clear Vault Cache
