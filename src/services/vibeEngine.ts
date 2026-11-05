@@ -168,14 +168,19 @@ export async function fetchNextVibeTrack(
         isCandidateFresh(t.channel, t.title) &&
         isVibeWorthy({ title: t.title, artist: t.channel, album: t.album, duration: t.durationSeconds }, 5000, dislikedArtists, dislikedTracks)
     );
-    if (worthyYtm.length > 0) {
-      const p = pickRandomTop(worthyYtm, poolCap);
-      return new AudioTrack({
-        videoId: p.id, title: p.title, artist: p.channel, album: p.album,
-        duration: p.durationSeconds, artworkUrl: p.thumbnail, source: 'autoplay',
-        isAutoplay: true, requestedBy: 'Vibe DJ (Song Radio)',
-        vibeReason: `Song Vibe: ${anchorSong?.title || targetArtist}`,
-      });
+    const topPool = worthyYtm.slice(0, poolCap).sort(() => Math.random() - 0.5);
+    for (const p of topPool) {
+      const dzVerify = await searchDeezerTracks(`${extractPrimaryArtist(p.channel)} ${p.title}`, 2);
+      const dzMatch = dzVerify.find((d) => (d.rank || 0) >= 80000);
+      if (dzMatch || src === 'ytmusic') {
+        return new AudioTrack({
+          videoId: p.id, deezerId: dzMatch?.id, title: dzMatch?.title || p.title,
+          artist: dzMatch?.artist || p.channel, album: dzMatch?.album || p.album,
+          duration: dzMatch?.duration || p.durationSeconds, artworkUrl: dzMatch?.cover || p.thumbnail,
+          isrc: dzMatch?.isrc, source: 'autoplay', isAutoplay: true,
+          requestedBy: 'Vibe DJ (Song Radio)', vibeReason: `Song Vibe: ${anchorSong?.title || targetArtist}`,
+        });
+      }
     }
   }
 
