@@ -87,13 +87,12 @@ export class BroadcastTee {
 
   public startTrackStream(
     streamUrl: string,
-    headers: Record<string, string> = {},
-    onTrackEnd?: () => void
+    headers: Record<string, string> = {}
   ): PassThrough {
     this.stopTrackStream();
     this.isPaused = false;
 
-    const discordPass = new PassThrough({ highWaterMark: 65536 });
+    const discordPass = new PassThrough({ highWaterMark: 19200 });
     this.activeDiscordStream = discordPass;
 
     const headerLines = Object.entries(headers)
@@ -143,13 +142,21 @@ export class BroadcastTee {
 
     decoder.stdout?.on('data', (chunk: Buffer) => {
       const scaled = this.applyVolumeAndMeter(chunk);
-      if (!discordPass.destroyed) {
-        discordPass.write(scaled);
-      }
       if (this.mp3Encoder && !this.mp3Encoder.stdin.destroyed && this.mp3Clients.size > 0) {
         try {
           this.mp3Encoder.stdin.write(scaled);
         } catch {}
+      }
+      if (!discordPass.destroyed) {
+        const canContinue = discordPass.write(scaled);
+        if (!canContinue) {
+          decoder.stdout?.pause();
+          discordPass.once('drain', () => {
+            if (this.trackDecoder === decoder && !this.isPaused) {
+              decoder.stdout?.resume();
+            }
+          });
+        }
       }
     });
 
@@ -158,7 +165,6 @@ export class BroadcastTee {
         this.trackDecoder = null;
         this.currentRmsDb = -100;
         if (!discordPass.destroyed) discordPass.end();
-        if (onTrackEnd) onTrackEnd();
       }
     });
 
@@ -204,6 +210,8 @@ export class BroadcastTee {
 
   public setPaused(paused: boolean): void {
     this.isPaused = paused;
+    if (paused) this.trackDecoder?.stdout?.pause();
+    else this.trackDecoder?.stdout?.resume();
   }
 
   public setVolume(volumePercent: number): void {

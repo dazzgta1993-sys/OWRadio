@@ -196,10 +196,7 @@ export class GuildPlayer extends EventEmitter {
       this.suppressIdleEvent = true;
       const pcmStream = this.broadcastTee.startTrackStream(
         nextTrack.streamUrl,
-        nextTrack.streamHeaders || {},
-        () => {
-          if (!this.suppressIdleEvent) void this.playNext();
-        }
+        nextTrack.streamHeaders || {}
       );
 
       this.playStartTime = Date.now();
