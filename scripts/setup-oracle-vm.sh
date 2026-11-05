@@ -52,16 +52,13 @@ $SUDO chmod a+rx /usr/local/bin/yt-dlp
 # 4. Install Ollama and pull local AI models (ARM64 optimized)
 echo "🧠 [4/6] Installing local Ollama engine for AI curation..."
 if ! command -v ollama >/dev/null 2>&1; then
-  curl -fsSL https://ollama.com/install.sh | sh
-fi
+  fi
 
 # Ensure Ollama service is running
 $SUDO systemctl enable --now ollama || true
 sleep 3
 
 echo "📥 Pulling AI models into local Ollama..."
-ollama pull qwen2.5:1.5b || echo "⚠️ Ollama model pull deferred"
-ollama pull all-minilm || echo "⚠️ Ollama embed model pull deferred"
 
 # 5. Open Host Firewall for Ports 8091, 80, 443 (OWRadio Web, Stream & Caddy HTTPS)
 echo "🛡️ [5/6] Opening Host Firewall ports (22, 80, 443, 8091)..."
@@ -86,7 +83,7 @@ CURRENT_USER="$(whoami)"
 $SUDO bash -c "cat > /etc/systemd/system/owradio.service << 'EOF'
 [Unit]
 Description=OWRadio - Open Web Radio & Discord Audio Engine
-After=network.target ollama.service
+After=network.target
 
 [Service]
 Type=simple

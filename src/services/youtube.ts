@@ -120,9 +120,65 @@ function getBaseYtDlpArgs(): string[] {
 }
 
 /**
- * Search YouTube for tracks matching a freeform query.
+ * Search YouTube Music directly for official studio tracks matching a query.
+ */
+export async function searchYouTubeMusic(query: string, limit = 5): Promise<YouTubeTrackMetadata[]> {
+  const baseArgs = getBaseYtDlpArgs();
+  const searchArg = `ytmsearch${limit}:${query}`;
+
+  try {
+    const { stdout } = await execFileAsync('yt-dlp', [
+      ...baseArgs,
+      '--dump-json',
+      '--flat-playlist',
+      '--default-search', 'ytmsearch',
+      searchArg,
+    ], { timeout: 12000, maxBuffer: 10 * 1024 * 1024 });
+
+    const lines = stdout.trim().split('\n').filter(Boolean);
+    const results: YouTubeTrackMetadata[] = [];
+
+    for (const line of lines) {
+      try {
+        const item = JSON.parse(line);
+        if (!item.id) continue;
+
+        const duration = Number(item.duration) || 0;
+        const rawTitle = item.title || 'Unknown Title';
+        const uploader = item.uploader || item.channel || '';
+        const { title, artist } = parseYouTubeTitle(rawTitle, uploader);
+
+        results.push({
+          id: `yt_${item.id}`,
+          videoId: item.id,
+          title,
+          artist,
+          durationSec: duration,
+          artworkUrl: `https://i.ytimg.com/vi/${item.id}/maxresdefault.jpg`,
+          artworkThumbUrl: `https://i.ytimg.com/vi/${item.id}/mqdefault.jpg`,
+        });
+      } catch {
+        // Skip unparseable line
+      }
+    }
+    return results;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Search tracks: tries YouTube Music (ytmsearch) for official studio audio first,
+ * falling back to standard YouTube (ytsearch) for live or rare tracks.
  */
 export async function searchTracks(query: string, limit = 5): Promise<YouTubeTrackMetadata[]> {
+  // 1. Try YouTube Music first for official release quality
+  const ytmResults = await searchYouTubeMusic(query, limit);
+  if (ytmResults.length > 0) {
+    return ytmResults;
+  }
+
+  // 2. Fallback to standard YouTube search
   const baseArgs = getBaseYtDlpArgs();
   const searchArg = `ytsearch${limit}:${query}`;
 

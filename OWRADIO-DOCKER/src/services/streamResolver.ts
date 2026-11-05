@@ -242,14 +242,12 @@ export async function resolveStream(
 
   const cookiesPath = config.YOUTUBE_COOKIES_PATH || (existsSync(path.resolve(process.cwd(), 'cookies.txt')) ? path.resolve(process.cwd(), 'cookies.txt') : undefined);
 
-  // --- Step 3: YouTube Search via yt-dlp ---
-  const searchQuery = `ytsearch5:${track.artist} - ${track.title} official audio`;
+  // --- Step 3: YouTube Music & YouTube Search via yt-dlp ---
   const baseArgs = [
     '--dump-json',
     '--flat-playlist',
     '--no-warnings',
     '--no-check-certificates',
-    '--default-search', 'ytsearch',
     '--extractor-args', 'youtube:player_client=web,android,ios',
     '--js-runtimes', 'node',
   ];
@@ -262,12 +260,14 @@ export async function resolveStream(
   }
 
   let candidates: YtDlpCandidate[] = [];
+
+  // 3a. Prioritize YouTube Music (ytmsearch) for pristine studio albums and official cuts
   try {
-    const { stdout } = await execFileAsync('yt-dlp', [...baseArgs, searchQuery], {
-      timeout: 10000,
+    const ytmQuery = `ytmsearch5:${track.artist} - ${track.title}`;
+    const { stdout } = await execFileAsync('yt-dlp', [...baseArgs, '--default-search', 'ytmsearch', ytmQuery], {
+      timeout: 8000,
       maxBuffer: 10 * 1024 * 1024,
     });
-
     const lines = stdout.trim().split('\n').filter(Boolean);
     for (const line of lines) {
       try {
@@ -280,12 +280,36 @@ export async function resolveStream(
             uploader: item.uploader || '',
           });
         }
-      } catch {
-        // Skip unparseable lines
-      }
+      } catch {}
     }
-  } catch (err) {
-    console.warn(`[StreamResolver] yt-dlp YouTube search failed for "${searchQuery}":`, (err as Error).message);
+  } catch {}
+
+  // 3b. Fallback to standard YouTube search if YouTube Music has no candidate
+  if (candidates.length === 0) {
+    const searchQuery = `ytsearch5:${track.artist} - ${track.title} official audio`;
+    try {
+      const { stdout } = await execFileAsync('yt-dlp', [...baseArgs, '--default-search', 'ytsearch', searchQuery], {
+        timeout: 10000,
+        maxBuffer: 10 * 1024 * 1024,
+      });
+
+      const lines = stdout.trim().split('\n').filter(Boolean);
+      for (const line of lines) {
+        try {
+          const item = JSON.parse(line);
+          if (item.id) {
+            candidates.push({
+              id: item.id,
+              title: item.title || '',
+              duration: item.duration,
+              uploader: item.uploader || '',
+            });
+          }
+        } catch {}
+      }
+    } catch (err) {
+      console.warn(`[StreamResolver] yt-dlp YouTube search failed:`, (err as Error).message);
+    }
   }
 
   // If initial official search found nothing, try direct Topic query before giving up on YouTube

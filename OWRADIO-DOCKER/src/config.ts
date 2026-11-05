@@ -34,15 +34,10 @@ const envSchema = z.object({
   /** Path to the SQLite WAL database file */
   DATABASE_PATH: z.string().default('./data/owradio.sqlite'),
 
-  /** Base URL of the Ollama server serving gemma4:e2b */
-  OLLAMA_URL: z.string().default('http://127.0.0.1:11434'),
-  OLLAMA_HOST: z.string().optional(),
 
-  /** Ollama model name for music curation */
-  OLLAMA_MODEL: z.string().default('qwen2.5:1.5b'),
 
   /** AI Curation Engine architecture: 'embedding' (Dense Vector), 'jev' (Discriminative Decision), 'llm' (Autoregressive), or 'hybrid' */
-  CURATION_ENGINE: z.enum(['embedding', 'jev', 'llm', 'hybrid']).default('hybrid'),
+  CURATION_ENGINE: z.enum(['embedding', 'hybrid', 'graph', 'deezer']).default('hybrid'),
 
   /** Cooldown window in hours for song autoplay repetition (default: 48) */
   AUTOPLAY_COOLDOWN_HOURS: z.coerce.number().default(48),
@@ -124,12 +119,6 @@ function loadConfig(): Config {
   }
   if (process.env.DEFAULT_GUILD_ID && !process.env.DISCORD_GUILD_ID) {
     process.env.DISCORD_GUILD_ID = process.env.DEFAULT_GUILD_ID;
-  }
-  if (process.env.OLLAMA_HOST && !process.env.OLLAMA_URL) {
-    process.env.OLLAMA_URL = process.env.OLLAMA_HOST;
-  }
-  if (process.env.OLLAMA_URL && !process.env.OLLAMA_HOST) {
-    process.env.OLLAMA_HOST = process.env.OLLAMA_URL;
   }
   const result = envSchema.safeParse(process.env);
   if (!result.success) {

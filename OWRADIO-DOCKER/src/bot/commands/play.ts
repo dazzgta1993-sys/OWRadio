@@ -19,7 +19,7 @@ import { AudioTrack } from '../../player/AudioTrack.js';
 import youtube from '../../services/youtube.js';
 import deezer from '../../services/deezer.js';
 import linkParser from '../../services/linkParser.js';
-import ollama from '../../services/ollama.js';
+import vibeService from '../../services/vibeService.js';
 import curator from '../../services/curator.js';
 import vectorCurator from '../../services/vectorCurator.js';
 import featureFlags from '../../services/featureFlags.js';
@@ -40,7 +40,7 @@ export const playCommand = new SlashCommandBuilder()
 
 export const vibeCommand = new SlashCommandBuilder()
   .setName('vibe')
-  .setDescription('AI DJ: Generate an instant playlist curated by local Ollama AI')
+  .setDescription('Generate an instant playlist curated by vibe & genre')
   .addStringOption((opt) =>
     opt
       .setName('prompt')
@@ -334,7 +334,7 @@ export async function handleVibe(
   // 3. Purge stale unplayed autoplay tracks so the new vibe takes effect IMMEDIATELY
   await player.recurateAutoplayBuffer();
 
-  const vibeItems = await ollama.generateVibePlaylist(prompt, 6);
+  const vibeItems = await vibeService.generateVibePlaylist(prompt, 6);
 
   if (vibeItems.length === 0) {
     if (isSteeringEngaged) {
@@ -350,7 +350,7 @@ export async function handleVibe(
       });
       return;
     }
-    await interaction.editReply(`❌ Local AI curator could not generate a playlist for: "${prompt}"`);
+    await interaction.editReply(`❌ Could not find tracks matching vibe: "${prompt}"`);
     return;
   }
 
@@ -481,7 +481,7 @@ export async function handleVibe(
         ? '🛰️ **384-d Latent Steering:** `ACTIVE` (Autoplay queue recurated to this vector)'
         : '⚡ *Standard Playlist Mode (384-d steering toggle is OFF in settings)*')
     )
-    .setFooter({ text: 'Ollama all-minilm • Type /vibe off to disengage' });
+    .setFooter({ text: 'OWRadio Vibe Engine • Type /vibe off to disengage' });
 
   const components: ActionRowBuilder<ButtonBuilder>[] = [];
   if (isSteeringEngaged) {

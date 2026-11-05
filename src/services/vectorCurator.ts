@@ -189,35 +189,8 @@ class VectorCurator {
   /**
    * Generates a 384-d embedding vector for a prompt using Ollama all-minilm.
    */
-  public async embedText(text: string): Promise<Float32Array | null> {
-    try {
-      // Use modern high-throughput /api/embed endpoint
-      const res = await fetch(`${config.OLLAMA_URL}/api/embed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'all-minilm',
-          input: text,
-        }),
-      });
-
-      if (!res.ok) {
-        console.warn(`[VectorCurator] Ollama /api/embed request failed with HTTP ${res.status}`);
-        return null;
-      }
-
-      const data = (await res.json()) as any;
-      const emb = Array.isArray(data.embeddings) ? data.embeddings[0] : data.embedding;
-      if (!emb || !Array.isArray(emb)) {
-        return null;
-      }
-
-      const vec = new Float32Array(emb);
-      return this.normalize(vec);
-    } catch (err) {
-      console.warn('[VectorCurator] Embedding API call error:', (err as Error).message);
-      return null;
-    }
+  public async embedText(_text: string): Promise<Float32Array | null> {
+    return null;
   }
 
   /**

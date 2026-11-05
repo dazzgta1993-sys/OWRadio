@@ -348,11 +348,11 @@ export function computeBrainPills(
         }
         break;
 
-      // 4. Qwen 1.5B Local LLM
-      case 'qwen_llm':
-        active = curatedBy === 'AI Room Mix' || curatedBy === 'AI Wildcard' || curatedBy === 'Ollama LLM' || (engine === 'llm' && !isManual);
+      // 4. MusicBrainz & Discovery
+      case 'musicbrainz_discog':
+        active = curatedBy.includes('MusicBrainz') || curatedBy.includes('Discovery');
         if (active) {
-          telemetry = `ACTIVE: Curated by local Qwen 1.5B neural model (clamped to 2 CPU threads).`;
+          telemetry = 'ACTIVE: Curated by MusicBrainz official discography and Deezer exploration.';
         }
         break;
 

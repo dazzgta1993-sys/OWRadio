@@ -37,7 +37,7 @@ echo "⚙️ Configuring systemd service (/etc/systemd/system/owradio.service)..
 ssh "${TARGET_HOST}" "sudo bash -c 'cat > /etc/systemd/system/owradio.service << \"EOF\"
 [Unit]
 Description=OWRadio - Open Web Radio & Discord Audio Engine
-After=network.target ollama.service
+After=network.target
 
 [Service]
 Type=simple

@@ -7,9 +7,8 @@
 import { sqlite } from '../db/index.js';
 import config from '../config.js';
 import deezer, { type DeezerTrackMetadata } from './deezer.js';
-import ollama from './ollama.js';
+import musicbrainz from './musicbrainz.js';
 import vectorCurator from './vectorCurator.js';
-import jevCurator from './jevCurator.js';
 import brainLogger from './brainLogger.js';
 import stationCurator from './stationCurator.js';
 import vetoService from './vetoService.js';
@@ -20,7 +19,7 @@ import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../util
 import { detectTrackLanguage, detectTrackLanguageAsync, LANGUAGE_METADATA, type TrackLanguage } from './languageDetector.js';
 import baselineService from './baselineService.js';
 
-export type CurationEngineType = 'embedding' | 'jev' | 'llm' | 'hybrid';
+export type CurationEngineType = 'embedding' | 'hybrid' | 'graph' | 'deezer';
 
 let currentEngine: CurationEngineType = (config.CURATION_ENGINE as CurationEngineType) || 'hybrid';
 
@@ -560,7 +559,7 @@ export function getActiveVoiceRoomProfile(memberUserIds: string[]): RoomTastePro
 }
 
 /**
- * Retrieves the last N played tracks from playback_history to supply anti-repetition context to Ollama.
+ * Retrieves the last N played tracks from playback_history to supply anti-repetition context to curation.
  */
 function getRecentPlaybackTitles(limit = 8): string[] {
   try {
@@ -867,41 +866,16 @@ export async function getNextAutoplayTracks(
         console.warn('[Curator] Latent vector curation tier error:', (err as Error).message);
       }
     }
-  } else if (currentEngine === 'jev') {
-    try {
-      const jevTracks = await jevCurator.curateNextTracks(
-        roomProfile,
-        memberUserIds,
-        count,
-        queuedSongIds,
-        queuedArtists,
-        queuedLanguages
-      );
-      for (const jt of jevTracks) {
-        results.push(jt);
-        const lang = await detectTrackLanguageAsync(jt.track.title, jt.track.artist);
-        if (lang !== 'en') queuedLanguages.add(lang);
-      }
-    } catch (err) {
-      console.warn('[Curator] Jev discriminative decision tier error:', (err as Error).message);
     }
-  } else if (currentEngine === 'llm') {
+
+  // --- MusicBrainz & Deezer Discography Discovery (if slots remain) ---
+  if (results.length < count && roomProfile.topLikedArtists.length > 0) {
     try {
-      const needed = count - results.length;
-      const aiRecommendations = await ollama.curateNextTracks(
-        {
-          activeMembersCount: roomProfile.memberCount,
-          likedArtists: roomProfile.topLikedArtists,
-          likedSongs: roomProfile.topLikedSongs,
-          dislikedArtists: roomProfile.dislikedArtists,
-          recentTracks,
-          randomSeedEra,
-        },
-        memberUserIds
-      );
-      for (const rec of aiRecommendations) {
+      const seedArtist = roomProfile.topLikedArtists[Math.floor(Math.random() * roomProfile.topLikedArtists.length)];
+      const mbRecordings = await musicbrainz.getArtistTopRecordings(seedArtist, 5);
+      for (const rec of mbRecordings) {
         if (results.length >= count) break;
-        const candidates = await deezer.searchTracks(`${rec.artist} ${rec.title}`, 3);
+        const candidates = await deezer.searchTracks(`${rec.artist} ${rec.title}`, 2);
         for (const candidate of candidates) {
           if (await isCandidateEligibleAsync(candidate, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages)) {
             queuedSongIds.add(candidate.id);
@@ -909,25 +883,20 @@ export async function getNextAutoplayTracks(
             const normA = normalizeArtist(candidate.artist).replace(/\s+/g, '');
             if (normA) queuedArtists.add(normA);
             queuedDedupeKeys.add(getTrackDedupeKey(candidate.title, candidate.artist));
-            const lang = await detectTrackLanguageAsync(candidate.title, candidate.artist);
-            if (lang !== 'en') queuedLanguages.add(lang);
             results.push({
               track: candidate,
-              curatedBy: rec.type === 'wildcard' ? 'AI Wildcard' : 'AI Room Mix',
-              curationReason: rec.reason || `Blends room affinities with ${randomSeedEra}`,
+              curatedBy: 'MusicBrainz & Deezer Discovery',
+              curationReason: `Official discography recommendation for ${seedArtist}`,
             });
             break;
           }
         }
       }
-    } catch (err) {
-      console.warn('[Curator] Ollama curation tier error:', (err as Error).message);
-    }
+    } catch {}
   }
 
-    // --- Tier 2: Dynamic Anti-Bubble Fallback ---
-  // If Ollama is offline or returned insufficient verified tracks, fill remaining slots dynamically
-  let tier2Attempts = 0;
+  // --- Tier 2: Dynamic Anti-Bubble Fallback ---
+    let tier2Attempts = 0;
   while (results.length < count && tier2Attempts < 8) {
     tier2Attempts++;
     const fallbackResult = await getDynamicFallbackTrack(roomProfile, queuedSongIds, queuedArtists, queuedDedupeKeys, queuedLanguages);

@@ -21,10 +21,10 @@ import { AudioTrack } from '../player/AudioTrack.js';
 import youtube from '../services/youtube.js';
 import deezer from '../services/deezer.js';
 import linkParser from '../services/linkParser.js';
-import ollama from '../services/ollama.js';
+import vibeService from '../services/vibeService.js';
+import musicbrainz from '../services/musicbrainz.js';
 import curator from '../services/curator.js';
 import vectorCurator from '../services/vectorCurator.js';
-import jevCurator from '../services/jevCurator.js';
 import brainLogger from '../services/brainLogger.js';
 import tasteRadar from '../services/tasteRadar.js';
 import playlistParser from '../services/playlistParser.js';
@@ -247,7 +247,7 @@ export function createWebServer(player: GuildPlayer) {
     }
 
     if (mode === 'vibe') {
-      const vibeItems = await ollama.generateVibePlaylist(query, 5);
+      const vibeItems = await vibeService.generateVibePlaylist(query, 5);
 
       const queuedSongIds = new Set<string>();
       const queuedArtists = new Set<string>();
@@ -718,10 +718,10 @@ export function createWebServer(player: GuildPlayer) {
 
     return c.json({
       vetoes: vetoService.getAllVetoes(),
-      model: config.OLLAMA_MODEL,
-      ollamaUrl: config.OLLAMA_URL,
+      model: 'MusicBrainz + Deezer + YouTube Music',
+      curationStatus: 'Active',
       currentEngine: curator.getEngine(),
-      availableEngines: ['embedding', 'jev', 'llm', 'hybrid'],
+      availableEngines: ['hybrid', 'graph', 'deezer'],
       indexedVectorsCount: vectorCurator.getIndexedCount(),
       threadClamp: 3,
       stats,
@@ -758,7 +758,7 @@ export function createWebServer(player: GuildPlayer) {
   app.post('/api/brain/engine', requireAdminAuth, async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const engine = body.engine;
-    if (engine !== 'embedding' && engine !== 'jev' && engine !== 'llm' && engine !== 'hybrid') {
+    if (engine !== 'embedding' && engine !== 'graph' && engine !== 'deezer' && engine !== 'hybrid') {
       return c.json({ error: 'Invalid engine. Must be "embedding", "jev", "llm", or "hybrid"' }, 400);
     }
     curator.setEngine(engine);
@@ -782,33 +782,12 @@ export function createWebServer(player: GuildPlayer) {
     const activeEngine = curator.getEngine();
     let recommendations: any[] = [];
 
-    if (activeEngine === 'embedding') {
-      recommendations = await vectorCurator.curateNextTracks(roomProfile, activeUserIds, 3);
-    } else if (activeEngine === 'jev') {
-      recommendations = await jevCurator.curateNextTracks(roomProfile, activeUserIds, 3);
-    } else if (activeEngine === 'llm') {
-      recommendations = await ollama.curateNextTracks(
-        {
-          activeMembersCount: roomProfile.memberCount,
-          likedArtists: roomProfile.topLikedArtists,
-          likedSongs: roomProfile.topLikedSongs,
-          dislikedArtists: roomProfile.dislikedArtists,
-          recentTracks: [],
-          randomSeedEra,
-        },
-        activeUserIds
-      );
-    } else {
-      // hybrid
-      recommendations = await curator.getNextAutoplayTracks(activeUserIds, 3);
-    }
+    recommendations = await curator.getNextAutoplayTracks(activeUserIds, 3);
 
     const durationMs = Math.round(performance.now() - t0);
     const latestInteraction = brainLogger.getRecentLogs(1)[0] || null;
 
-    let modelName = config.OLLAMA_MODEL;
-    if (activeEngine === 'embedding') modelName = 'all-minilm (Dense Vector)';
-    if (activeEngine === 'jev') modelName = `${config.OLLAMA_MODEL} (Jev Decision Head)`;
+    let modelName = 'MusicBrainz + Deezer + YouTube Music';
 
     return c.json({
       success: true,

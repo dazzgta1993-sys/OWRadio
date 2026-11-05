@@ -309,33 +309,6 @@ export class TasteRadar {
 
       // Step 5: Optional Batch Embed via Ollama /api/embed
       let embedData: any = null;
-      try {
-        const inputs = newTracks.map((t) => {
-          let desc = `${t.artist} - ${t.title}`;
-          if (t.album) desc += ` [Album: ${t.album}]`;
-          if (t.genre) desc += ` [Genre: ${t.genre}]`;
-          return desc;
-        });
-
-        const embedRes = await fetch('http://127.0.0.1:11434/api/embed', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: 'all-minilm',
-            input: inputs,
-          }),
-          signal: AbortSignal.timeout(8000),
-        });
-
-        if (embedRes.ok) {
-          const json = (await embedRes.json()) as any;
-          if (json.embeddings && json.embeddings.length === newTracks.length) {
-            embedData = json;
-          }
-        }
-      } catch {
-        // Ollama offline or uninstalled: non-fatal, metadata is still saved to SQLite catalog
-      }
 
       // Step 6: Atomic SQLite Transaction Insert into songs & song_embeddings
       const now = Math.floor(Date.now() / 1000);
