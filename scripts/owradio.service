@@ -1,16 +1,17 @@
 [Unit]
-Description=VEXO Discord Music Bot & VLC Stream
+Description=OWRadio - Open Web Radio & Discord Audio Engine
 After=network.target ollama.service
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/vexo
+WorkingDirectory=/home/ubuntu/owradio
 ExecStart=/usr/bin/npx tsx src/index.ts
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target

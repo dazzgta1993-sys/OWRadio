@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # ==============================================================================
 # deploy_oci.sh
-# Automated deployment and systemd daemonization script for VEXO on Oracle Cloud
+# Automated deployment and systemd daemonization script for OWRadio on Oracle Cloud
 # ==============================================================================
 
 set -euo pipefail
 
 TARGET_HOST="oracle"
-REMOTE_DIR="/home/ubuntu/vexo"
+REMOTE_DIR="/home/ubuntu/owradio"
 
-echo "🚀 Deploying VEXO to Oracle Cloud Infrastructure (${TARGET_HOST})..."
+echo "🚀 Deploying OWRadio to Oracle Cloud Infrastructure (${TARGET_HOST})..."
 
 # 1. Ensure remote directory exists
 ssh "${TARGET_HOST}" "mkdir -p ${REMOTE_DIR}"
@@ -33,10 +33,10 @@ echo "📥 Installing npm packages on target..."
 ssh "${TARGET_HOST}" "cd ${REMOTE_DIR} && npm install --omit=dev"
 
 # 5. Configure systemd unit
-echo "⚙️ Configuring systemd service (/etc/systemd/system/vexo.service)..."
-ssh "${TARGET_HOST}" "sudo bash -c 'cat > /etc/systemd/system/vexo.service << \"EOF\"
+echo "⚙️ Configuring systemd service (/etc/systemd/system/owradio.service)..."
+ssh "${TARGET_HOST}" "sudo bash -c 'cat > /etc/systemd/system/owradio.service << \"EOF\"
 [Unit]
-Description=VEXO Discord Music Bot & VLC Stream
+Description=OWRadio - Open Web Radio & Discord Audio Engine
 After=network.target ollama.service
 
 [Service]
@@ -48,15 +48,16 @@ Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
+Environment=NODE_ENV=production
 
 [Install]
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable vexo.service
-systemctl restart vexo.service
+systemctl enable owradio.service
+systemctl restart owradio.service
 '"
 
-echo "✅ VEXO successfully deployed and running under systemd on ${TARGET_HOST}!"
-echo "📡 Check status with: ssh ${TARGET_HOST} 'systemctl status vexo'"
-echo "📜 View logs with: ssh ${TARGET_HOST} 'journalctl -u vexo -f'"
+echo "✅ OWRadio successfully deployed and running under systemd on ${TARGET_HOST}!"
+echo "📡 Check status with: ssh ${TARGET_HOST} 'systemctl status owradio'"
+echo "📜 View logs with: ssh ${TARGET_HOST} 'journalctl -u owradio -f'"

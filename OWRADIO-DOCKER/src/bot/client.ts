@@ -303,7 +303,7 @@ export async function createDiscordBot(player: GuildPlayer): Promise<Client> {
         const coverBadge = coverSetting === 'none' ? '🚫 No Covers' : (coverSetting === 'high_quality' ? '⭐ HQ Covers' : '📻 Any Cover');
         const rerecordBadge = rerecordSetting === 'none' ? '🚫 Original Masters' : '📻 Any Cut';
 
-        const webBaseUrl = config.PUBLIC_URL || (state.streamUrl && !state.streamUrl.includes('127.0.0.1') ? state.streamUrl.replace('/stream.mp3', '') : 'https://vexo.plingindigo.org');
+        const webBaseUrl = config.PUBLIC_URL || (state.streamUrl && !state.streamUrl.includes('127.0.0.1') ? state.streamUrl.replace('/stream.mp3', '') : (state.streamUrl ? state.streamUrl.replace('/stream.mp3', '') : `http://127.0.0.1:${config.WEB_PORT}`));
         const cleanWebUrl = webBaseUrl.replace(/\/+$/, '');
 
         const moreEmbed = new EmbedBuilder()

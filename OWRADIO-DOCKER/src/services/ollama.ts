@@ -255,7 +255,7 @@ export async function curateNextTracks(
 
   const vetoedStr = context.dislikedArtists.slice(0, 8).join(', ') || 'None';
 
-  const prompt = `You are VEXO, an elite autonomous radio DJ & music director.
+  const prompt = `You are OWRadio, an elite autonomous radio DJ & music director.
 Curate the next 4 tracks with deep music intelligence, harmonic progression, and anti-cliché taste.
 
 === ACTIVE LISTENERS (FROM DATABASE) ===
@@ -314,7 +314,7 @@ Return ONLY JSON:
  * Converts a natural language vibe prompt into a themed playlist.
  */
 export async function generateVibePlaylist(userPrompt: string, count = 8): Promise<VibeItem[]> {
-  const prompt = `You are VEXO, an expert DJ.
+  const prompt = `You are OWRadio, an expert DJ.
 The user wants a playlist with this specific mood/vibe: "${userPrompt}"
 
 Output exactly ${count} real, iconic or deep-cut songs that fit this vibe perfectly.

@@ -61,7 +61,7 @@ export class PlayerUiService {
     this.player = player;
 
     // Restore last bound UI channel and active message from persistent storage
-    this.boundChannelId = getBotState('last_ui_channel_id', '') || null;
+    this.boundChannelId = getBotState('last_ui_channel_id', '') || config.DEFAULT_TEXT_CHANNEL_ID || null;
     this.currentMessageId = getBotState('last_ui_message_id', '') || null;
 
     // Listen to player state changes (song start, finish, skip, pause, resume)
@@ -470,7 +470,7 @@ export class PlayerUiService {
     const yearStr = track.releaseYear ? ` (${track.releaseYear})` : '';
     const albumStr = track.album ? ` • 💿 *${track.album}${yearStr}*` : (yearStr ? ` • 📅 *${yearStr}*` : '');
 
-    const webBaseUrl = config.PUBLIC_URL || (state.streamUrl && !state.streamUrl.includes('127.0.0.1') ? state.streamUrl.replace('/stream.mp3', '') : 'https://vexo.plingindigo.org');
+    const webBaseUrl = config.PUBLIC_URL || (state.streamUrl && !state.streamUrl.includes('127.0.0.1') ? state.streamUrl.replace('/stream.mp3', '') : (state.streamUrl ? state.streamUrl.replace('/stream.mp3', '') : `http://127.0.0.1:${config.WEB_PORT}`));
     const cleanWebUrl = webBaseUrl.replace(/\/+$/, '');
 
     // Ultra-Compact 3-Line Micro-Card (<100px)

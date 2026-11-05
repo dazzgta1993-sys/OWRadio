@@ -42,8 +42,8 @@ echo "🔍 [4/4] Probing container status..."
 sudo /usr/local/sbin/musicbot-control status
 
 echo "===================================================================="
-echo "🎉 OWRadio is now active on vexo!"
-echo "🌐 Dashboard: https://vexo.plingindigo.org"
-echo "📻 Stream:    https://vexo.plingindigo.org/stream.mp3"
+echo "🎉 OWRadio is now active!"
+echo "🌐 Dashboard: http://localhost:8091"
+echo "📻 Stream:    http://localhost:8091/stream.mp3"
 echo "To revert to legacy Python bot at any time: ./rollback-to-legacy.sh"
 echo "===================================================================="

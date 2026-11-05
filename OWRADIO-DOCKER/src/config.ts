@@ -18,7 +18,9 @@ const envSchema = z.object({
   DISCORD_TOKEN: z.string().optional(),
 
   /** Optional default Guild ID to bind to on startup. If omitted, the first cached guild is used. */
+  DISCORD_CLIENT_ID: z.string().optional(),
   DEFAULT_GUILD_ID: z.string().optional(),
+  DISCORD_GUILD_ID: z.string().optional(),
 
   /** HTTP port for the embedded Hono web server (default: 8091) */
   WEB_PORT: z.coerce.number().default(8091),
@@ -27,13 +29,14 @@ const envSchema = z.object({
   WEB_HOST: z.string().default('0.0.0.0'),
 
   /** Optional public URL or domain (e.g. https://myradio.duckdns.org) for reverse proxy setups */
-  PUBLIC_URL: z.string().default('https://vexo.plingindigo.org'),
+  PUBLIC_URL: z.string().default(''),
 
   /** Path to the SQLite WAL database file */
-  DATABASE_PATH: z.string().default('./data/vexo.db'),
+  DATABASE_PATH: z.string().default('./data/owradio.sqlite'),
 
   /** Base URL of the Ollama server serving gemma4:e2b */
   OLLAMA_URL: z.string().default('http://127.0.0.1:11434'),
+  OLLAMA_HOST: z.string().optional(),
 
   /** Ollama model name for music curation */
   OLLAMA_MODEL: z.string().default('qwen2.5:1.5b'),
@@ -82,6 +85,7 @@ const envSchema = z.object({
 
   /** Optional default voice channel ID to join on auto-resume if no previous state exists */
   DEFAULT_VOICE_CHANNEL_ID: z.string().optional(),
+  DEFAULT_TEXT_CHANNEL_ID: z.string().optional(),
 
   /** Delay in seconds after Discord gateway ready before initiating auto-resume (default: 2) */
   AUTO_RESUME_DELAY_SEC: z.coerce.number().default(2),
@@ -115,6 +119,18 @@ export type Config = z.infer<typeof envSchema>;
  * Parse and freeze configuration. Throws on validation failure with formatted error list.
  */
 function loadConfig(): Config {
+  if (process.env.DISCORD_GUILD_ID && !process.env.DEFAULT_GUILD_ID) {
+    process.env.DEFAULT_GUILD_ID = process.env.DISCORD_GUILD_ID;
+  }
+  if (process.env.DEFAULT_GUILD_ID && !process.env.DISCORD_GUILD_ID) {
+    process.env.DISCORD_GUILD_ID = process.env.DEFAULT_GUILD_ID;
+  }
+  if (process.env.OLLAMA_HOST && !process.env.OLLAMA_URL) {
+    process.env.OLLAMA_URL = process.env.OLLAMA_HOST;
+  }
+  if (process.env.OLLAMA_URL && !process.env.OLLAMA_HOST) {
+    process.env.OLLAMA_HOST = process.env.OLLAMA_URL;
+  }
   const result = envSchema.safeParse(process.env);
   if (!result.success) {
     console.error('❌ Invalid environment configuration:');

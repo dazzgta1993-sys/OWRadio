@@ -23,6 +23,6 @@ RUN npm ci
 COPY src ./src
 COPY scripts ./scripts
 
-EXPOSE 8080
+EXPOSE 8091
 
 CMD ["npm", "start"]

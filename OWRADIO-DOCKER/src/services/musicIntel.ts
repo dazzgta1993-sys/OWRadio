@@ -101,7 +101,7 @@ export async function getWikipediaArtistExtract(artistName: string): Promise<str
     const slug = encodeURIComponent(artistName.replace(/\s+/g, '_'));
     const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${slug}`;
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'VexoMusicBot/2.0 (music curation assistant)' },
+      headers: { 'User-Agent': 'OWRadio/2.1.0 (music curation assistant)' },
       signal: AbortSignal.timeout(2500),
     });
 

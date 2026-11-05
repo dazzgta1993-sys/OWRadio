@@ -134,7 +134,9 @@ class VectorCurator {
 
       for (let i = 0; i < count; i++) {
         const row = rows[i];
-        const vec = new Float32Array(row.vector.buffer, row.vector.byteOffset, VECTOR_DIM);
+        const vec = row.vector.byteOffset % 4 === 0
+          ? new Float32Array(row.vector.buffer, row.vector.byteOffset, VECTOR_DIM)
+          : new Float32Array(row.vector.buffer.slice(row.vector.byteOffset, row.vector.byteOffset + VECTOR_DIM * 4));
         this.allVectors.set(vec, i * VECTOR_DIM);
 
         this.catalog[i] = {

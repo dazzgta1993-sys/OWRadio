@@ -13,6 +13,7 @@ import { serve } from '@hono/node-server';
 import { PassThrough } from 'node:stream';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import config from '../config.js';
 import authService from './auth.js';
 import type { GuildPlayer } from '../player/GuildPlayer.js';
@@ -53,7 +54,7 @@ export function createWebServer(player: GuildPlayer) {
     c.header('Connection', 'keep-alive');
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
-    c.header('icy-name', 'VEXO Live Radio');
+    c.header('icy-name', 'OWRadio Live Radio');
     c.header('icy-genre', 'Eclectic Curation');
     c.header('icy-br', '192');
 
@@ -528,12 +529,23 @@ export function createWebServer(player: GuildPlayer) {
     return c.json({ success: true, vetoes: vetoService.getAllVetoes() });
   });
 
-  // --- Wipe Taste Preferences (Requires re-entering Admin Password) ---
+  // --- Wipe Taste Preferences (Requires re-entering Admin Password or Valid Admin Session) ---
   app.post('/api/preferences/wipe', async (c) => {
     const body = await c.req.json().catch(() => ({}));
-    const provided = body.password || body.adminPassword || '';
-    if (!config.ADMIN_PASSWORD || provided !== config.ADMIN_PASSWORD) {
-      return c.json({ error: 'Invalid admin password. Double confirmation failed.' }, 401);
+    const provided = String(body.password || body.adminPassword || '');
+    const isAdmin = checkIsAdmin(c);
+
+    let isAuthorized = false;
+    if (!authService.isAuthEnabled()) {
+      isAuthorized = true;
+    } else if (provided && authService.verifyAdminPassword(provided)) {
+      isAuthorized = true;
+    } else if (isAdmin && (!config.ADMIN_PASSWORD || authService.verifyAdminPassword(provided))) {
+      isAuthorized = true;
+    }
+
+    if (!isAuthorized) {
+      return c.json({ error: 'Invalid admin credentials. Authentication failed.' }, 401);
     }
     sqlite.prepare('DELETE FROM user_preferences').run();
     return c.json({ success: true, message: 'Taste preferences successfully wiped.' });
@@ -1073,15 +1085,6 @@ export function createWebServer(player: GuildPlayer) {
     });
   });
 
-  // --- 5q. POST /api/settings/restart (Graceful Server Daemon Restart) ---
-  app.post('/api/settings/restart', requireAdminAuth, (c) => {
-    console.log('[WebServer] ⚡ Admin requested server daemon restart via WebUI Settings.');
-    setTimeout(() => {
-      console.log('[WebServer] Exiting process for systemd auto-restart...');
-      process.exit(0);
-    }, 600);
-    return c.json({ success: true, message: 'Server daemon restart initiated' });
-  });
 
   // --- 5q. GET /api/taste/radar (Taste Radar Fingerprint Alias) ---
   app.get('/api/taste/radar', (c) => {
@@ -1164,19 +1167,33 @@ export function createWebServer(player: GuildPlayer) {
   });
 
   // --- 7. Serve Embedded Dashboard ---
+  const resolvePublicFile = (filename: string): string | null => {
+    const __dirname = path.dirname(fileURLToPath(import.meta.url));
+    const candidates = [
+      path.join(process.cwd(), 'src', 'web', 'public', filename),
+      path.join(process.cwd(), 'dist', 'web', 'public', filename),
+      path.join(__dirname, 'public', filename),
+      path.join(process.cwd(), 'public', filename),
+    ];
+    for (const candidate of candidates) {
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  };
+
   const serveIndexHtml = (c: any) => {
-    const htmlPath = path.join(process.cwd(), 'src', 'web', 'public', 'index.html');
-    if (fs.existsSync(htmlPath)) {
+    const htmlPath = resolvePublicFile('index.html');
+    if (htmlPath) {
       return c.html(fs.readFileSync(htmlPath, 'utf-8'));
     }
-    return c.text('VEXO Web Dashboard loading...');
+    return c.text('OWRadio Web Dashboard loading...');
   };
   app.get('/', serveIndexHtml);
   app.get('/index.html', serveIndexHtml);
 
   app.get('/app.js', (c) => {
-    const jsPath = path.join(process.cwd(), 'src', 'web', 'public', 'app.js');
-    if (fs.existsSync(jsPath)) {
+    const jsPath = resolvePublicFile('app.js');
+    if (jsPath) {
       c.header('Content-Type', 'application/javascript');
       return c.body(fs.readFileSync(jsPath, 'utf-8'));
     }

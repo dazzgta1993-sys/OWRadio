@@ -178,7 +178,7 @@ class StationCuratorService {
       const res = await fetch(
         `https://en.wikipedia.org/w/api.php?action=parse&page=Billboard_Year-End_Hot_100_singles_of_${year}&prop=wikitext&format=json`,
         {
-          headers: { 'User-Agent': 'VexoMusicBot/2.0 (contact@vexo.app)' },
+          headers: { 'User-Agent': 'OWRadio/2.1.0 (https://github.com/clawdiapai/OWRadio)' },
           signal: AbortSignal.timeout(6000),
         }
       );
@@ -225,7 +225,7 @@ class StationCuratorService {
       const res = await fetch(
         `https://musicbrainz.org/ws/2/recording?query=date:${year}%20AND%20status:official&fmt=json&limit=50`,
         {
-          headers: { 'User-Agent': 'VexoMusicBot/2.0 (contact@vexo.app)' },
+          headers: { 'User-Agent': 'OWRadio/2.1.0 (https://github.com/clawdiapai/OWRadio)' },
           signal: AbortSignal.timeout(6000),
         }
       );

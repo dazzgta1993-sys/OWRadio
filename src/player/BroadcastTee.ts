@@ -46,19 +46,28 @@ for (let i = 0; i <= CROSSFADE_FRAMES; i++) {
 }
 
 /**
+ * Safely converts a Buffer to an Int16Array with byteOffset alignment fallback.
+ */
+function toInt16Array(buf: Buffer, sampleCount: number): Int16Array {
+  if (buf.byteOffset % 2 === 0) {
+    return new Int16Array(buf.buffer, buf.byteOffset, sampleCount);
+  }
+  return new Int16Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + sampleCount * 2));
+}
+
+/**
  * Mixes two 20ms s16le PCM frames together with specified gains and int16 clamping.
  */
 function mixPcmFrames(frameA: Buffer, frameB: Buffer, gainA: number, gainB: number): Buffer {
-  const mixed = Buffer.allocUnsafe(PCM_FRAME_SIZE);
-  const int16A = new Int16Array(frameA.buffer, frameA.byteOffset, SAMPLES_PER_FRAME);
-  const int16B = new Int16Array(frameB.buffer, frameB.byteOffset, SAMPLES_PER_FRAME);
-  const int16Out = new Int16Array(mixed.buffer, mixed.byteOffset, SAMPLES_PER_FRAME);
+  const int16A = toInt16Array(frameA, SAMPLES_PER_FRAME);
+  const int16B = toInt16Array(frameB, SAMPLES_PER_FRAME);
+  const int16Out = new Int16Array(SAMPLES_PER_FRAME);
 
   for (let i = 0; i < SAMPLES_PER_FRAME; i++) {
     const val = Math.round(int16A[i] * gainA + int16B[i] * gainB);
     int16Out[i] = val > 32767 ? 32767 : val < -32768 ? -32768 : val;
   }
-  return mixed;
+  return Buffer.from(int16Out.buffer, int16Out.byteOffset, int16Out.byteLength);
 }
 
 /**
@@ -67,15 +76,14 @@ function mixPcmFrames(frameA: Buffer, frameB: Buffer, gainA: number, gainB: numb
 function applyGainToFrame(frame: Buffer, gain: number): Buffer {
   if (gain >= 0.999) return frame;
   if (gain <= 0.001) return Buffer.alloc(PCM_FRAME_SIZE);
-  const out = Buffer.allocUnsafe(PCM_FRAME_SIZE);
-  const int16In = new Int16Array(frame.buffer, frame.byteOffset, SAMPLES_PER_FRAME);
-  const int16Out = new Int16Array(out.buffer, out.byteOffset, SAMPLES_PER_FRAME);
+  const int16In = toInt16Array(frame, SAMPLES_PER_FRAME);
+  const int16Out = new Int16Array(SAMPLES_PER_FRAME);
 
   for (let i = 0; i < SAMPLES_PER_FRAME; i++) {
     const val = Math.round(int16In[i] * gain);
     int16Out[i] = val > 32767 ? 32767 : val < -32768 ? -32768 : val;
   }
-  return out;
+  return Buffer.from(int16Out.buffer, int16Out.byteOffset, int16Out.byteLength);
 }
 
 /**

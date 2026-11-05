@@ -32,7 +32,7 @@ docker compose up -d --build
 ### 4. Check Logs & Health
 ```bash
 docker compose logs -f musicbot
-curl -I http://localhost:8080/stream.mp3
+curl -I http://localhost:8091/stream.mp3
 ```
 
 ---
