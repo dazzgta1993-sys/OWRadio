@@ -38,17 +38,79 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 
-// Switch between Level 1 (Minimal), Level 2 (Studio), Level 3 (Brain Logs), and Level 4 (Settings)
+// Switch between Studio Player (Level 2) and Settings (Level 4)
+
+// Universal Fast-Play Bar submission
+async function submitFastPlay() {
+  const input = document.getElementById('fast-play-input');
+  const query = input ? input.value.trim() : '';
+  if (!query) return;
+
+  showToast(`Searching for "${query}"...`, 'info');
+  try {
+    const res = await fetch('/api/queue/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, mode: 'song', playNow: false }),
+    });
+
+    const data = await res.json();
+    if (res.ok) {
+      const trackTitle = data.track ? `${data.track.artist} - ${data.track.title}` : (data.enqueuedCount ? `${data.enqueuedCount} tracks` : query);
+      showToast(`✓ Added to Queue: ${trackTitle}`, 'success');
+      if (input) input.value = '';
+      renderQueue();
+    } else {
+      showToast(data.error || 'Track could not be found.', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+// Quick re-queue from history
+async function enqueueTrack(query) {
+  if (!query) return;
+  showToast(`Re-queueing "${query}"...`, 'info');
+  try {
+    const res = await fetch('/api/queue/add', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, mode: 'song', playNow: false }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(`✓ Re-queued: ${query}`, 'success');
+      renderQueue();
+    } else {
+      showToast(data.error || 'Failed to re-queue', 'error');
+    }
+  } catch (err) {
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+// Sidebar Tab Switcher (Queue, History, Listeners)
+function switchSideTab(tab) {
+  const tabs = ['queue', 'history', 'listeners'];
+  tabs.forEach((t) => {
+    const btn = document.getElementById(`side-tab-${t}`);
+    const panel = document.getElementById(`side-panel-${t}`);
+    if (btn) btn.classList.toggle('active', t === tab);
+    if (panel) panel.style.display = t === tab ? 'block' : 'none';
+  });
+}
+
 function switchLevel(lvl) {
-  // If authentication is active and user is not logged in as Admin, lock out levels 2, 3, 4
-  if (lvl > 1 && currentAuthState.enabled && !currentAuthState.authenticated) {
+  // Only gate Settings (lvl 4) behind Admin login if enabled
+  if (lvl === 4 && currentAuthState.enabled && !currentAuthState.authenticated) {
     if (typeof showToast === 'function') {
-      showToast('Admin password required to unlock Studio Dashboard', 'warning');
+      showToast('Admin password required to open Settings', 'warning');
     }
     if (typeof openAuthModal === 'function') {
       openAuthModal();
     }
-    lvl = 1;
+    return;
   }
 
   currentLevel = lvl;
@@ -57,49 +119,23 @@ function switchLevel(lvl) {
   // Update tabs
   document.querySelectorAll('.level-tab').forEach((tab) => {
     const tabLvl = parseInt(tab.getAttribute('data-level'), 10);
-    if (tabLvl === lvl) {
-      tab.classList.add('active');
-    } else {
-      tab.classList.remove('active');
-    }
+    tab.classList.toggle('active', tabLvl === lvl);
   });
 
   // Toggle views
-  const v1 = document.getElementById('view-level-1');
   const v2 = document.getElementById('view-level-2');
-  const v3 = document.getElementById('view-level-3');
   const v4 = document.getElementById('view-level-4');
 
-  if (v1) v1.style.display = lvl === 1 ? 'flex' : 'none';
   if (v2) v2.style.display = lvl === 2 ? 'block' : 'none';
-  if (v3) v3.style.display = lvl === 3 ? 'block' : 'none';
-  if (v4) v4.style.display = lvl === 4 ? 'block' : 'none';
-
-  if (lvl === 1) {
-    const input = document.getElementById('hero-input');
-    if (input) input.focus();
+  if (v4) {
+    v4.style.display = lvl === 4 ? 'block' : 'none';
+    if (lvl === 4) {
+      loadSettingsSubsystems();
+    }
   }
 
   if (lvl === 2) {
     initWaveform();
-    loadFeatureFlags();
-  }
-
-  if (lvl === 3) {
-    fetchBrainData();
-    fetchTasteRadar();
-    if (!brainPollInterval) {
-      brainPollInterval = setInterval(fetchBrainData, 4000);
-    }
-  } else if (brainPollInterval) {
-    clearInterval(brainPollInterval);
-    brainPollInterval = null;
-  }
-
-  if (lvl === 4) {
-    loadFeatureFlags();
-    loadSettingsSubsystems();
-    loadVetoes();
   }
 }
 

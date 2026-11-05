@@ -2096,17 +2096,11 @@
       </div>
 
       <nav class="level-nav">
-        <button class="level-tab active" data-level="1" onclick="switchLevel(1)">
-          <span class="badge-num">1</span> Minimal Search
+        <button id="tab-btn-player" class="level-tab active" data-level="2" onclick="switchLevel(2)">
+          🎵 Studio Player
         </button>
-        <button class="level-tab" data-level="2" onclick="switchLevel(2)">
-          <span class="badge-num">2</span> Studio Dashboard
-        </button>
-        <button class="level-tab" data-level="3" onclick="switchLevel(3)">
-          <span class="badge-num">3</span> 📜 History &amp; Cooldowns
-        </button>
-        <button class="level-tab" data-level="4" onclick="switchLevel(4)">
-          <span class="badge-num">4</span> ⚙️ Settings
+        <button id="tab-btn-settings" class="level-tab" data-level="4" onclick="switchLevel(4)">
+          ⚙️ Settings
         </button>
       </nav>
 
@@ -2130,67 +2124,21 @@
     <!-- ========================================================
          LEVEL 1: MINIMAL QUICK SEARCH LANDING PAGE
          ======================================================== -->
-    <div id="view-level-1">
-      <div class="hero-box">
-        <h1 class="hero-title">Stream Any Song to Discord & VLC</h1>
-        <p class="hero-subtitle">
-          Type a song title, artist name, YouTube video URL, or playlist link to stream seamlessly with zero dropouts.
-        </p>
-
-        <div class="hero-input-group">
-          <span class="hero-input-icon">🔍</span>
-          <input 
-            id="hero-input" 
-            class="hero-input" 
-            type="text" 
-            placeholder="Search song name, YouTube URL, or playlist link..." 
-            onkeydown="if(event.key === 'Enter') handleHeroEnterKey()"
-            autofocus
-          >
-        </div>
-
-        <div class="hero-actions">
-          <button id="btn-hero-play" class="btn btn-primary" onclick="submitHero(true)" style="display: none; padding: 14px 28px; font-size: 15px;">
-            ▶ Play Now
-          </button>
-          <button id="btn-hero-queue" class="btn btn-primary" onclick="submitHero(false)" style="padding: 14px 28px; font-size: 15px;">
-            + Add to Queue
-          </button>
-        </div>
-
-        <div id="hero-feedback" class="hero-feedback"></div>
-
-        <div class="suggestion-chips">
-          <span style="font-size: 12px; color: var(--text-subtle); align-self: center;">Quick picks:</span>
-          <button class="chip" onclick="setHeroQuery('Placebo - Song To Say Goodbye')">Placebo - Song To Say Goodbye</button>
-          <button class="chip" onclick="setHeroQuery('Daft Punk - Get Lucky')">Daft Punk - Get Lucky</button>
-          <button class="chip" onclick="setHeroQuery('Radiohead - Creep')">Radiohead - Creep</button>
-          <button class="chip" onclick="setHeroQuery('The Cure - Lovesong')">The Cure - Lovesong</button>
-        </div>
+        <div id="view-level-2" style="display: block;">
+      <!-- Universal Fast-Play Bar -->
+      <div class="card" style="margin-bottom: 24px; padding: 14px 20px; display: flex; align-items: center; gap: 14px; background: rgba(18, 20, 29, 0.9); border-color: rgba(99, 102, 241, 0.35); box-shadow: 0 4px 20px rgba(0,0,0,0.4);">
+        <span style="font-size: 18px; color: var(--accent);">🔍</span>
+        <input 
+          id="fast-play-input" 
+          type="text" 
+          placeholder="Search any song title, artist, album, or paste YouTube/Spotify link..." 
+          style="flex: 1; background: transparent; border: none; outline: none; font-size: 14px; color: #fff; font-family: inherit;"
+          onkeydown="if(event.key === 'Enter') submitFastPlay()"
+        >
+        <button class="btn btn-primary" onclick="submitFastPlay()" style="padding: 10px 22px; font-weight: 700; white-space: nowrap;">
+          + Add to Queue
+        </button>
       </div>
-
-      <!-- Mini Player Card at Bottom of Level 1 -->
-      <div class="mini-player-card">
-        <div class="mini-meta">
-          <img id="mini-art" class="mini-art" src="https://e-cdn-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/250x250-000000-80-0-0.jpg" alt="Art">
-          <div class="mini-info">
-            <div id="mini-title" class="mini-title">Waiting for track...</div>
-            <div id="mini-artist" class="mini-artist">Autonomous Music Engine</div>
-          </div>
-        </div>
-
-        <div class="mini-controls">
-          <button id="mini-btn-pause" class="btn btn-icon" onclick="togglePlayPause()" title="Play / Pause">⏸️</button>
-          <button class="btn btn-icon" onclick="triggerAction('skip')" title="Skip">⏭️</button>
-          <button id="mini-studio-btn" class="btn" onclick="switchLevel(2)" style="font-size: 12px; padding: 8px 12px;">Studio ↗</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ========================================================
-         LEVEL 2: STUDIO DASHBOARD
-         ======================================================== -->
-    <div id="view-level-2">
       <div class="dashboard-grid">
         <!-- Main Player View -->
         <div class="player-hero card">
@@ -2256,26 +2204,47 @@
           </div>
         </div>
 
-        <!-- Right Column: Queue & Room Listeners -->
+        <!-- Right Column: Queue, History & Listeners Tabbed Box -->
         <div class="sidebar-col">
-          <div class="card">
-            <div class="section-title">
-              <span>🎧</span> Active Voice Room Listeners
+          <div class="card" style="display: flex; flex-direction: column; min-height: 540px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px; gap: 8px; flex-wrap: wrap;">
+              <div style="display: flex; gap: 6px;">
+                <button id="side-tab-queue" class="brain-tab-btn active" onclick="switchSideTab('queue')" style="padding: 6px 14px; font-size: 12px;">
+                  📑 Queue (<span id="side-queue-count">0</span>)
+                </button>
+                <button id="side-tab-history" class="brain-tab-btn" onclick="switchSideTab('history')" style="padding: 6px 14px; font-size: 12px;">
+                  🕒 History
+                </button>
+                <button id="side-tab-listeners" class="brain-tab-btn" onclick="switchSideTab('listeners')" style="padding: 6px 14px; font-size: 12px;">
+                  🎙️ Listeners (<span id="side-listener-count">0</span>)
+                </button>
+              </div>
             </div>
-            <div id="listeners-box" class="listeners-list">
-              <span style="color: var(--text-subtle); font-size: 13px;">No active Discord listeners</span>
-            </div>
-          </div>
 
-          <div class="card" style="flex: 1;">
-            <div class="section-title">
-              <span>📑</span> Upcoming Queue & Autoplay Buffer
+            <!-- Queue Panel -->
+            <div id="side-panel-queue" style="display: block; flex: 1; overflow-y: auto;">
+              <div id="queue-box" class="queue-list">
+                <div style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 20px;">Queue is empty</div>
+              </div>
             </div>
-            <div id="queue-box" class="queue-list">
-              <div style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 20px;">Queue is empty</div>
+
+            <!-- History Panel -->
+            <div id="side-panel-history" style="display: none; flex: 1; overflow-y: auto;">
+              <div id="history-box" class="settings-list">
+                <div style="color: var(--text-subtle); font-size: 13px; text-align: center; padding: 20px;">No recently played tracks yet</div>
+              </div>
+            </div>
+
+            <!-- Listeners Panel -->
+            <div id="side-panel-listeners" style="display: none; flex: 1; overflow-y: auto;">
+              <div id="listeners-box" class="listeners-list">
+                <span style="color: var(--text-subtle); font-size: 13px;">No active Discord listeners</span>
+              </div>
             </div>
           </div>
         </div>
+      </div>
+    </div>
       </div>
 
       </div>
@@ -2283,178 +2252,6 @@
 
     <!-- ========================================================
          LEVEL 3: BRAIN LOGS & OBSERVABILITY CENTER
-         ======================================================== -->
-    <div id="view-level-3">
-      <!-- Header with title & refresh -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-        <div>
-          <h2 style="font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px;">
-            📜 Playback History &amp; Cooldowns
-          </h2>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
-            Live log of played tracks and active 48h song / 2h artist anti-repetition cooldown locks.
-          </p>
-        </div>
-        <div>
-          <button class="btn btn-primary" onclick="fetchBrainData()" style="padding: 9px 16px; font-size: 13px;">
-            🔄 Refresh
-          </button>
-        </div>
-      </div>
-
-      <!-- Sub-navigation tabs within Level 3 -->
-      <div class="brain-subnav">
-        <button id="brain-tab-cooldown" class="brain-tab-btn active" onclick="switchBrainSubTab('cooldown')">
-          🛡️ Anti-Repetition &amp; Cooldowns (<span id="brain-badge-cooldown-count">0</span>)
-        </button>
-        <button id="brain-tab-pref" class="brain-tab-btn" onclick="switchBrainSubTab('pref')">
-          ❤️ Listener Preferences (<span id="brain-badge-pref-count">0</span>)
-        </button>
-      </div>
-        <button id="brain-tab-pref" class="brain-tab-btn active" onclick="switchBrainSubTab('pref')">
-          ❤️ Taste & Preference Matrix (<span id="brain-badge-pref-count">0</span>)
-        </button>
-        <button id="brain-tab-cooldown" class="brain-tab-btn" onclick="switchBrainSubTab('cooldown')">
-          🛡️ Anti-Repetition & Cooldowns (<span id="brain-badge-cooldown-count">0</span>)
-        </button>
-        <button id="brain-tab-vetoes" class="brain-tab-btn" onclick="switchBrainSubTab('vetoes')">
-          ⛔ Blacklist & Room Vetoes (<span id="brain-badge-vetoes-count">0</span>)
-        </button>
-        <button id="brain-tab-room" class="brain-tab-btn" onclick="switchBrainSubTab('room')">
-          👥 Active Room Taste Blend
-        </button>
-        <button id="brain-tab-baseline" class="brain-tab-btn" onclick="switchBrainSubTab('baseline')">
-          🧬 Station DNA (Baseline)
-        </button>
-      </div>
-
-      <!-- Brain Section 2: Taste & Preference Matrix -->
-      <div id="brain-section-pref" style="display: none;">
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap;">
-          <div style="display: flex; gap: 8px; align-items: center; flex: 1;">
-          <input 
-            id="brain-pref-search" 
-            type="text" 
-            class="input-field" 
-            placeholder="Filter by artist name, song title, or listener ID..." 
-            style="max-width: 380px; margin-bottom: 0;"
-            oninput="renderPreferencesTable()"
-          >
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <span style="font-size: 12px; color: var(--text-muted);" id="brain-pref-total-label">Showing preferences</span>
-            <button class="btn btn-danger" style="font-size: 11px; padding: 6px 12px; white-space: nowrap;" onclick="wipeAllPreferences()">⚠️ Wipe All Preferences</button>
-          </div>
-        </div>
-
-        <div class="brain-table-container">
-          <table class="brain-table">
-            <thead>
-              <tr>
-                <th>Listener</th>
-                <th>Target Type</th>
-                <th>Target Name / Key</th>
-                <th>Affinity Score</th>
-                <th>Likes (+3.0)</th>
-                <th>Full Plays (+1.0)</th>
-                <th>Early Skips (-1.5)</th>
-                <th>Dislikes (-4.0)</th>
-                <th>Last Updated</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="brain-preferences-tbody">
-              <tr>
-                <td colspan="9" style="text-align: center; padding: 30px; color: var(--text-muted);">Loading preferences...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Brain Section 3: Anti-Repetition & Cooldowns -->
-      <div id="brain-section-cooldown" style="display: block;">
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px;">
-          <!-- Left: 48-Hour Song Cooldowns -->
-          <div class="card" style="padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <span style="font-size: 15px; font-weight: 700; color: #fff;">🎵 48-Hour Song Cooldowns</span>
-              <span id="badge-song-cooldown-count" class="badge-tag">0 LOCKED</span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-              Songs played within the last 48 hours are strictly ineligible for autoplay:
-            </p>
-            <div id="brain-cooldown-songs-list" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-              <div style="text-align: center; padding: 20px; color: var(--text-muted);">No songs currently locked</div>
-            </div>
-          </div>
-
-          <!-- Middle: 2-Hour Artist Cooldowns -->
-          <div class="card" style="padding: 20px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <span style="font-size: 15px; font-weight: 700; color: #fff;">🎤 2-Hour Artist Cooldowns</span>
-              <span id="badge-artist-cooldown-count" class="badge-tag">0 LOCKED</span>
-            </div>
-            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">
-              Artists cannot autoplay again until 2 full hours have elapsed:
-            </p>
-            <div id="brain-cooldown-artists-list" style="max-height: 480px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
-              <div style="text-align: center; padding: 20px; color: var(--text-muted);">No artists currently locked</div>
-            </div>
-          </div>
-
-          </div>
-      </div>
-
-      <!-- Brain Section 5: Dedicated Vetoes & Blacklist Manager -->
-      <div id="brain-section-vetoes" style="display: none;">
-        <!-- Explainer Banner -->
-        <div style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-          <div style="font-weight: 700; color: #f87171; font-size: 13px; margin-bottom: 4px;">⛔ Station Blacklist & Anti-Trolling Guard:</div>
-          <div style="font-size: 12px; color: #e2e8f0;">
-            Artists and tracks listed here are permanently banned from autonomous curation. Community vetoes trigger automatically when 3 listeners dislike an artist in voice chat. Click <strong>✕ Pop</strong> to instantly unveto and restore any artist.
-          </div>
-        </div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap;">
-          <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 280px;">
-            <input 
-              id="brain-veto-search" 
-              type="text" 
-              class="input-field" 
-              placeholder="Filter by artist name, track title, or reason..." 
-              style="max-width: 380px; margin-bottom: 0;"
-              oninput="renderVetoesTable()"
-            >
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <span style="font-size: 12px; color: var(--text-muted);" id="brain-veto-total-label">Showing blacklisted items</span>
-          </div>
-        </div>
-
-        <div class="brain-table-container">
-          <table class="brain-table">
-            <thead>
-              <tr>
-                <th>Target Type</th>
-                <th>Blacklisted Name / Key</th>
-                <th>Source / Reason</th>
-                <th>Date Added</th>
-                <th style="text-align: right;">Action</th>
-              </tr>
-            </thead>
-            <tbody id="brain-vetoes-tbody">
-              <tr>
-                <td colspan="5" style="text-align: center; padding: 30px; color: var(--text-muted);">Loading blacklisted items...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ========================================================
-         LEVEL 4: DEDICATED SETTINGS & FEATURE FLAG CONTROLS
          ======================================================== -->
     <div id="view-level-4" style="display: none; animation: fadeIn 0.3s ease;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
