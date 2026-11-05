@@ -1717,47 +1717,7 @@ function filterFeatureFlags(category, target = 'l2') {
   renderFeatureFlags();
 }
 
-function renderFeatureFlags() {
-  ['level2', 'level4'].forEach((level) => {
-    const grid = document.getElementById(`features-grid-${level}`);
-    if (!grid) return;
-    const targetKey = level === 'level2' ? 'l2' : 'l4';
-    const cat = currentFilter[targetKey] || 'all';
-
-    const filtered = cat === 'all'
-      ? currentFeatureFlags
-      : currentFeatureFlags.filter((f) => f.category === cat);
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-muted); padding: 30px;">No features found in "${escapeHtml(cat)}"</div>`;
-      return;
-    }
-
-    grid.innerHTML = filtered.map((f) => `
-      <div class="feature-card ${f.enabled ? 'enabled' : 'disabled'}" id="card-${f.id}-${level}">
-        <div class="feature-card-top">
-          <div class="feature-card-meta">
-            <div class="feature-icon">${f.icon || '⚙️'}</div>
-            <div>
-              <div class="feature-title">${escapeHtml(f.name)}</div>
-              <div class="feature-desc">${escapeHtml(f.description)}</div>
-            </div>
-          </div>
-          <label class="switch" title="Toggle ${escapeHtml(f.name)}">
-            <input type="checkbox" ${f.enabled ? 'checked' : ''} onchange="toggleFeatureFlag('${f.id}', this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
-        <div class="feature-card-footer">
-          <span class="feature-badge-category">${escapeHtml(f.category)}</span>
-          <span class="feature-status-text ${f.enabled ? 'status-on' : 'status-off'}">
-            ${f.enabled ? '● ACTIVE' : '○ DISABLED'}
-          </span>
-        </div>
-      </div>
-    `).join('');
-  });
-}
+function renderFeatureFlags() { return; }
 
 function updateFeatureCounters() {
   const total = currentFeatureFlags.length;

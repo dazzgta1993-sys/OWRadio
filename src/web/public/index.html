@@ -2111,11 +2111,7 @@
       </nav>
 
       <div style="display: flex; gap: 10px; align-items: center;">
-        <div class="radar-pill" id="header-radar-pill" onclick="switchLevel(3); setTimeout(() => document.getElementById('taste-radar-container')?.scrollIntoView({behavior: 'smooth'}), 50);" title="Autonomous 50k Taste Radar Progress">
-          <span style="font-size: 14px;">🛰️</span>
-          <span class="radar-pill-text" id="header-radar-text">50k Radar: --</span>
-          <div class="radar-mini-bar">
-            <div class="radar-mini-bar-fill" id="header-radar-fill" style="width: 0%;"></div>
+        
           </div>
         </div>
         <button class="btn btn-primary" style="padding: 8px 14px; font-size: 13px;" onclick="openModal()">+ Add Track</button>
@@ -2315,65 +2311,6 @@
           <button class="btn" onclick="fetchBrainData()" style="padding: 9px 14px; font-size: 13px;">
             🔄 Refresh
           </button>
-        </div>
-      </div>
-
-      <!-- Hybrid AI DJ Engine & Collaborative Graph Card -->
-      <div class="taste-radar-card" id="taste-radar-container">
-        <div class="taste-radar-header">
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <div class="taste-radar-badge-icon">🎧</div>
-            <div>
-              <div style="font-size: 15px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
-                Hybrid AI DJ Engine • JIT Collaborative Graph
-                <span id="radar-live-indicator" class="radar-live-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.3);">ACTIVE</span>
-              </div>
-              <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
-                20/50/30 Degrees of Separation (Last.fm + Deezer), Camelot Wheel harmonic transitions & Qwen 1.5B intent recipes
-              </div>
-            </div>
-          </div>
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="btn" id="radar-scan-btn" onclick="triggerManualRadarScan()" style="padding: 8px 16px; font-size: 12px; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.12); color: #38bdf8; font-weight: 600;">
-              ⚡ Probe Collaborative Graph
-            </button>
-          </div>
-        </div>
-
-        <div class="taste-radar-metrics">
-          <div class="taste-radar-metric">
-            <span class="taste-radar-metric-label">Curation Architecture</span>
-            <span class="taste-radar-metric-val" style="color: #38bdf8;">Hybrid JIT</span>
-          </div>
-          <div class="taste-radar-metric">
-            <span class="taste-radar-metric-label">Collaborative Universe</span>
-            <span class="taste-radar-metric-val" style="color: #a78bfa;">100M+ Tracks</span>
-          </div>
-          <div class="taste-radar-metric">
-            <span class="taste-radar-metric-label">Harmonic Mixing</span>
-            <span class="taste-radar-metric-val" style="color: #34d399;">Camelot Wheel</span>
-          </div>
-          <div class="taste-radar-metric">
-            <span class="taste-radar-metric-label">Autoplay Ceiling</span>
-            <span class="taste-radar-metric-val" style="color: #fbbf24;">8m Studio Match</span>
-          </div>
-        </div>
-
-        <!-- 1-Time Onboarding Quick Form -->
-        <div style="margin: 14px 0 6px 0; display: flex; gap: 8px; flex-wrap: wrap;">
-          <input type="text" id="onboard-playlist-input" class="search-input" placeholder="Drop Spotify or YouTube playlist URL to onboard your taste DNA..." style="flex: 1; min-width: 280px; padding: 8px 14px; font-size: 13px;" />
-          <button class="btn" onclick="submitOnboardPlaylist()" style="padding: 8px 16px; font-size: 12px; background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4); font-weight: 600;">
-            🧬 Ingest Playlist
-          </button>
-        </div>
-
-        <div class="taste-radar-footer">
-          <span id="radar-status-msg" style="color: #94a3b8;">
-            🛰️ Hybrid Graph active: Blending 20% core anchors, 50% collaborative deep-cuts, 30% musical bridge.
-          </span>
-          <span id="radar-last-mined" style="color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
-            Studio Purity: &plusmn;5s Delta
-          </span>
         </div>
       </div>
 
@@ -2686,26 +2623,6 @@
       <!-- Dynamic Runtime Settings Console (Sliders, Toggles, Steppers, Radios) -->
       <div id="dynamic-settings-container" class="config-settings-grid">
         <!-- Dynamically rendered by renderConfigSettings() -->
-      </div>
-
-      <!-- Feature Flags Grid in Level 4 -->
-      <div class="card" style="padding: 24px; margin-bottom: 24px;">
-        <div class="settings-card-header" style="margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
-          <div class="settings-card-title">
-            <span>🎛️</span> Runtime Feature Flag Toggles (Persistent in SQLite)
-          </div>
-          <div class="features-filter-bar" id="features-filter-l4">
-            <button class="btn-filter active" data-filter="all" onclick="filterFeatureFlags('all', 'l4')">All (12)</button>
-            <button class="btn-filter" data-filter="Curation" onclick="filterFeatureFlags('Curation', 'l4')">Curation</button>
-            <button class="btn-filter" data-filter="Audio & Mixing" onclick="filterFeatureFlags('Audio & Mixing', 'l4')">Audio &amp; Mixing</button>
-            <button class="btn-filter" data-filter="Discord" onclick="filterFeatureFlags('Discord', 'l4')">Discord</button>
-            <button class="btn-filter" data-filter="WebUI" onclick="filterFeatureFlags('WebUI', 'l4')">WebUI</button>
-          </div>
-        </div>
-
-        <div class="features-grid" id="features-grid-level4">
-          <!-- Dynamically populated via renderFeatureFlags() -->
-        </div>
       </div>
 
       <!-- Subsystem Quick Controls Grid -->
