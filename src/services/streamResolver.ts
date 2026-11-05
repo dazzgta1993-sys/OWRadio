@@ -163,21 +163,6 @@ export async function resolveStream(
 ): Promise<ResolvedStream | null> {
   const now = Math.floor(Date.now() / 1000);
 
-  // --- Step 0: Instant Offline Cache (Server Vault) ---
-  if (featureFlags.isEnabled('feature_offline_vault') && vault.hasTrack(track.id)) {
-    const vaultPath = vault.getTrackPath(track.id);
-    if (vaultPath) {
-      console.log(`[StreamResolver] ⚡ Serving "${track.title}" directly from Server Vault (${vaultPath})`);
-      return {
-        songId: track.id,
-        youtubeId: 'vault_local',
-        streamUrl: vaultPath,
-        durationSec: track.durationSec,
-        source: 'cache',
-      };
-    }
-  }
-
   // --- Step 1: L2 SQLite Cache Check ---
   try {
     const cached = sqlite.prepare(`

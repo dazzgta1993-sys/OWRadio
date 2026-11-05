@@ -21,9 +21,7 @@ import deezer from '../../services/deezer.js';
 import linkParser from '../../services/linkParser.js';
 import vibeService from '../../services/vibeService.js';
 import curator from '../../services/curator.js';
-import vectorCurator from '../../services/vectorCurator.js';
 import featureFlags from '../../services/featureFlags.js';
-import { detectTrackLanguage } from '../../services/languageDetector.js';
 import dynamicSettings from '../../services/dynamicSettings.js';
 import { normalizeArtist, getTrackDedupeKey } from '../../utils/trackDedupe.js';
 

@@ -1517,11 +1517,7 @@ export class GuildPlayer extends EventEmitter {
     const targetTrack = this.queue[targetIdx];
     console.log(`[GuildPlayer] ⏩ Jumping directly to #${targetIdx + 1} "${targetTrack.title}" by ${targetTrack.artist}`);
 
-    // If local vault has the track, immediately assign local SSD stream path!
-    if (vault.hasTrack(targetTrack.id)) {
-      const vPath = vault.getTrackPath(targetTrack.id);
-      if (vPath) targetTrack.streamUrl = vPath;
-    } else if (!targetTrack.streamUrl) {
+    if (!targetTrack.streamUrl) {
       const res = await streamResolver.resolveStream(targetTrack);
       if (res) targetTrack.streamUrl = res.streamUrl;
     }

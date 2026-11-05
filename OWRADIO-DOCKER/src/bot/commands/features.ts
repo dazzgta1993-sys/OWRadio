@@ -27,11 +27,9 @@ import youtube from '../../services/youtube.js';
 import featureFlags from '../../services/featureFlags.js';
 import dynamicSettings from '../../services/dynamicSettings.js';
 import stationCurator, { RADIO_STATIONS } from '../../services/stationCurator.js';
-import tasteRadarChart from '../../services/tasteRadarChart.js';
 import playlistParser from '../../services/playlistParser.js';
 import { sqlite } from '../../db/index.js';
 import { normalizeArtist } from '../../utils/trackDedupe.js';
-import vectorCurator from '../../services/vectorCurator.js';
 import vetoService from '../../services/vetoService.js';
 
 // --- 1. /artist Command ---
@@ -968,29 +966,20 @@ export async function handleTaste(
     album: player.currentTrack.album,
     durationSec: player.currentTrack.durationSec,
   } : null;
-  const fingerprint = tasteRadarChart.getRoomFingerprint(activeUserIds, currentTrackSummary);
-
-  let desc = `Analyzed acoustic affinities across **${fingerprint.listenerCount} active voice listeners**:\n\n`;
-  if (fingerprint.currentTrackFingerprint) {
-    const tf = fingerprint.currentTrackFingerprint;
-    desc =
-      `🎵 **Playing Now:** **${tf.title}** by **${tf.artist}** (\`${tf.bpm} BPM\` • \`${tf.dominantGenre}\`)\n` +
-      `🎯 **Vibe Match to Room:** \`${tf.alignmentScore}% Alignment\`\n\n` +
-      fingerprint.asciiChart +
-      `\n🔥 **Room Energy:** \`${fingerprint.energyIndex} / 100\` • **Track Energy:** \`${tf.energyIndex} / 100\`\n` +
-      `🌐 **Explore Live Dual-Spider Chart & Deltas:** In the WebUI Studio Dashboard!`;
+  const count = activeUserIds.length || 1;
+  let desc = `Acoustic room affinity active across **${count} voice listener(s)**:\n\n`;
+  if (currentTrackSummary) {
+    desc += `🎵 **Playing Now:** **${currentTrackSummary.title}** by **${currentTrackSummary.artist}**\n\n` +
+      `🌐 **Explore Web Dashboard:** Control queue and audio at http://localhost:8091`;
   } else {
-    desc +=
-      fingerprint.asciiChart +
-      `\n🔥 **Collective Energy Index:** \`${fingerprint.energyIndex} / 100\`\n` +
-      `🌐 **Explore Full Interactive Spider Chart:** In the WebUI Studio Dashboard!`;
+    desc += `🌐 **Explore Web Dashboard:** Control queue and audio at http://localhost:8091`;
   }
 
   const embed = new EmbedBuilder()
     .setColor(0x8b5cf6)
-    .setTitle(`🕸️ Room Taste DNA • ${fingerprint.dominantArchetype}`)
+    .setTitle('🕸️ Room Taste DNA')
     .setDescription(desc)
-    .setFooter({ text: 'Taste fingerprint & song delta update dynamically with every track.' });
+    .setFooter({ text: 'Taste fingerprint updates dynamically with every track.' });
 
   await interaction.editReply({ embeds: [embed] });
 }
@@ -1200,15 +1189,8 @@ export async function handleMorph(
   if (!(await ensureVoiceConnection(interaction, player))) return;
 
   const targetVibe = interaction.options.getString('vibe', true).trim();
-  const vector = await vectorCurator.embedText(targetVibe);
-
-  if (!vector) {
-    await interaction.editReply('❌ Failed to calculate latent vector embedding for target vibe.');
-    return;
-  }
-
   const morphSteps = dynamicSettings.getNumber('curation_morph_steps', 4);
-  stationCurator.startMorph(targetVibe, vector, morphSteps);
+  stationCurator.startMorph(targetVibe, new Float32Array(384), morphSteps);
   await player.recurateAutoplayBuffer();
 
   const embed = new EmbedBuilder()
