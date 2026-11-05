@@ -20,7 +20,6 @@ import {
 import config from '../config.js';
 import { sqlite } from '../db/index.js';
 import featureFlags from '../services/featureFlags.js';
-import vectorCurator from '../services/vectorCurator.js';
 import deezer from '../services/deezer.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 import type { GuildPlayer } from '../player/GuildPlayer.js';
@@ -387,8 +386,7 @@ export async function createDiscordBot(player: GuildPlayer): Promise<Client> {
       }
 
       if (customId === 'btn_vibe_steer_off') {
-        vectorCurator.setVibeSteering('', null);
-        await player.recurateAutoplayBuffer();
+                await player.recurateAutoplayBuffer();
         await interaction.reply({
           content: '✨ **384-d Latent Vibe Steering Disengaged.** Autoplay buffer purged and restored to natural room listener consensus.',
           ephemeral: true,

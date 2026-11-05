@@ -6,7 +6,6 @@
 
 import { EventEmitter } from 'node:events';
 import { sqlite } from '../db/index.js';
-import brainLogger from './brainLogger.js';
 
 export interface FeatureFlagDefinition {
   id: string;
@@ -208,17 +207,7 @@ class FeatureFlagsService extends EventEmitter {
         VALUES (?, ?, ?)
       `).run(featureId, enabled ? 1 : 0, now);
 
-      brainLogger.logInteraction({
-        timestamp: now,
-        model: 'feature_manager',
-        action: 'custom',
-        prompt: `Toggle Feature Flag: ${featureId} -> ${enabled ? 'ENABLED' : 'DISABLED'}`,
-        response: JSON.stringify({ featureId, enabled, timestamp: new Date().toISOString() }),
-        durationMs: 1,
-        status: 'success',
-        metadata: { featureId, enabled },
-      });
-
+      
       console.log(`[FeatureFlags] ⚙️ Feature "${featureId}" set to ${enabled ? 'ENABLED' : 'DISABLED'}`);
       this.emit('change', { featureId, enabled });
     } catch (err) {

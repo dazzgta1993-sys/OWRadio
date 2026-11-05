@@ -9,7 +9,6 @@ import { sqlite } from './db/index.js';
 import { GuildPlayer } from './player/GuildPlayer.js';
 import { createDiscordBot } from './bot/client.js';
 import { startWebServer } from './web/server.js';
-import vectorCurator from './services/vectorCurator.js';
 import tasteRadar from './services/tasteRadar.js';
 import type { Client } from 'discord.js';
 
@@ -18,10 +17,6 @@ console.log('⚡ OWRADIO - OPEN WEB RADIO & DISCORD AUDIO ENGINE');
 console.log('====================================================');
 
 async function main() {
-  // 0. Initialize JEPA / Latent Vector Curation Index
-  console.log('[Bootstrap] Initializing JEPA / Latent Vector Curation Index...');
-  await vectorCurator.init();
-
   // 1. Initialize Player Engine
   console.log('[Bootstrap] Initializing Single-Server Player Engine...');
   const player = new GuildPlayer();

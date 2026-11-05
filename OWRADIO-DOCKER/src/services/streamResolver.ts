@@ -12,7 +12,6 @@ import { sqlite } from '../db/index.js';
 import config from '../config.js';
 import deezerService, { type DeezerTrackMetadata } from './deezer.js';
 import youtubeService from './youtube.js';
-import vault from './vault.js';
 import featureFlags from './featureFlags.js';
 import dynamicSettings from './dynamicSettings.js';
 
@@ -199,9 +198,6 @@ export async function resolveStream(
       const streamUrl = isSoundcloud
         ? cached.stream_url
         : `https://www.youtube.com/watch?v=${cached.youtube_id}`;
-
-      vault.maybePrecache(track.id, streamUrl);
-
       return {
         songId: track.id,
         youtubeId: cached.youtube_id,
@@ -227,9 +223,6 @@ export async function resolveStream(
           VALUES (?, ?, ?, ?)
         `).run(track.id, videoId, watchUrl, expiresAt);
       } catch {}
-
-      vault.maybePrecache(track.id, watchUrl);
-
       return {
         songId: track.id,
         youtubeId: videoId,

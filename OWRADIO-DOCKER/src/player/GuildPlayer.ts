@@ -28,11 +28,8 @@ import curator from '../services/curator.js';
 import featureFlags from '../services/featureFlags.js';
 import harmonicMixing from '../services/harmonicMixing.js';
 import stationCurator from '../services/stationCurator.js';
-import vault from '../services/vault.js';
 import vetoService from '../services/vetoService.js';
 import dynamicSettings from '../services/dynamicSettings.js';
-import tasteRadarChart from '../services/tasteRadarChart.js';
-import brainMatrix, { type BrainPillPayload } from '../services/brainMatrix.js';
 import { getTrackDedupeKey, isDuplicateTrack, normalizeArtist } from '../utils/trackDedupe.js';
 
 export interface PlayerStatePayload {
@@ -100,12 +97,7 @@ export class GuildPlayer extends EventEmitter {
             console.warn(`[GuildPlayer] Background queue stream resolution error for "${track.title}":`, (err as Error).message);
           }
           await new Promise((r) => setTimeout(r, 100));
-        }
-
-        // Auto-vault upcoming queue tracks in background for instant 0ms local SSD playback
-        if (track.streamUrl && track.streamUrl.startsWith('http') && !vault.hasTrack(track.id)) {
-          vault.maybePrecache(track.id, track.streamUrl, true).catch(() => {});
-        }
+        }        }
 
         // Continuously feed newly resolved streams into multi-deck standby pool
         if (track.streamUrl) {
@@ -751,8 +743,6 @@ export class GuildPlayer extends EventEmitter {
     this.updateVoiceChannelStatus(track);
 
     // Warm up acoustic DNA tags via collaborative Last.fm graph
-    void tasteRadarChart.enrichArtistTags(track.artist);
-
     // Persist playback state for auto-resume
     setBotState('was_playing', '1');
     setBotState('last_track_id', track.id);
@@ -1441,12 +1431,7 @@ export class GuildPlayer extends EventEmitter {
       : 0;
 
     const upNextTrack = this.pendingTrack || this.queue[0];
-    const brainPills = brainMatrix.computeBrainPills(
-      this.currentTrack,
-      this.previousTrack,
-      this.lastTransitionAnalysis,
-      this.getActiveListenerNames().length
-    );
+    const brainPills: any[] = [];
     const activeBrainCount = brainPills.filter((p) => p.active).length;
 
     return {

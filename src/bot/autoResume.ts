@@ -10,7 +10,6 @@ import config from '../config.js';
 import { getBotState } from '../db/index.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 import type { GuildPlayer } from '../player/GuildPlayer.js';
-import brainLogger from '../services/brainLogger.js';
 import playerUi from './playerUi.js';
 
 export interface AutoResumeResult {
@@ -165,31 +164,7 @@ export async function executeAutoResume(
     }
 
     // 3. Log to Brain Telemetry
-    brainLogger.logInteraction({
-      timestamp: Math.floor(Date.now() / 1000),
-      model: 'system_autoresume',
-      action: 'custom',
-      prompt: `Auto-resume on bot restart | Guild: ${guild.name} (${guild.id}) | Channel: ${channel.name} (${channel.id})`,
-      response: JSON.stringify(
-        {
-          success: true,
-          guild: guild.name,
-          channel: channel.name,
-          activeListeners: listenerCount,
-          track: currentTrackName,
-        },
-        null,
-        2
-      ),
-      durationMs: 0,
-      status: 'success',
-      metadata: {
-        guildId: guild.id,
-        channelId: channel.id,
-        listeners: listenerCount,
-      },
-    });
-
+    
     return {
       resumed: true,
       guildId: guild.id,

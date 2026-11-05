@@ -312,8 +312,7 @@ export async function handleVibe(
   // 1. Check if user wants to turn off / disengage vibe steering
   const isOffCommand = ['off', 'clear', 'reset', 'none', 'stop', 'disable'].includes(prompt.toLowerCase());
   if (isOffCommand) {
-    vectorCurator.setVibeSteering('', null);
-    await player.recurateAutoplayBuffer();
+        await player.recurateAutoplayBuffer();
     await interaction.editReply({
       content: '✨ **Latent Vibe Steering Disengaged.** Autoplay buffer restored to natural room consensus.',
       components: [],
@@ -324,10 +323,9 @@ export async function handleVibe(
   // 2. If 384-d Latent Steering is enabled, embed prompt and set real-time steering vector
   let isSteeringEngaged = false;
   if (featureFlags.isEnabled('feature_vibe_latent')) {
-    const vector = await vectorCurator.embedText(prompt);
+    const vector = null;
     if (vector) {
-      vectorCurator.setVibeSteering(prompt, vector);
-      isSteeringEngaged = true;
+            isSteeringEngaged = true;
     }
   }
 
@@ -365,7 +363,7 @@ export async function handleVibe(
     const normCurArt = normalizeArtist(player.currentTrack.artist).replace(/\s+/g, '');
     if (normCurArt) queuedArtists.add(normCurArt);
     queuedDedupeKeys.add(getTrackDedupeKey(player.currentTrack.title, player.currentTrack.artist));
-    const lang = detectTrackLanguage(player.currentTrack.title, player.currentTrack.artist);
+    const lang = 'en';
     if (lang !== 'en') queuedLanguages.add(lang);
   }
 
@@ -375,7 +373,7 @@ export async function handleVibe(
     const normQArt = normalizeArtist(q.artist).replace(/\s+/g, '');
     if (normQArt) queuedArtists.add(normQArt);
     queuedDedupeKeys.add(getTrackDedupeKey(q.title, q.artist));
-    const lang = detectTrackLanguage(q.title, q.artist);
+    const lang = 'en';
     if (lang !== 'en') queuedLanguages.add(lang);
   }
 
@@ -421,7 +419,7 @@ export async function handleVibe(
         if (candNormArt) queuedArtists.add(candNormArt);
         if (itemNormArtist) queuedArtists.add(itemNormArtist);
         queuedDedupeKeys.add(candKey);
-        const candLang = detectTrackLanguage(ytCandidate.title, ytCandidate.artist);
+        const candLang = 'en';
         if (candLang !== 'en') queuedLanguages.add(candLang);
         queuedCount++;
         continue;
@@ -464,7 +462,7 @@ export async function handleVibe(
         if (metaNormArt) queuedArtists.add(metaNormArt);
         if (itemNormArtist) queuedArtists.add(itemNormArtist);
         queuedDedupeKeys.add(metaKey);
-        const metaLang = detectTrackLanguage(meta.title, meta.artist);
+        const metaLang = 'en';
         if (metaLang !== 'en') queuedLanguages.add(metaLang);
         queuedCount++;
       }

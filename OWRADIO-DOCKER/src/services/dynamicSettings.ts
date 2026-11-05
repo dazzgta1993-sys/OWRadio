@@ -7,7 +7,6 @@
 
 import { EventEmitter } from 'node:events';
 import { sqlite } from '../db/index.js';
-import brainLogger from './brainLogger.js';
 
 export interface SettingDefinition<T = any> {
   key: string;
@@ -599,17 +598,7 @@ class DynamicSettingsService extends EventEmitter {
 
       this.cache.set(key, { value: coercedValue, updatedAt: now });
 
-      brainLogger.logInteraction({
-        timestamp: now,
-        model: 'system',
-        action: 'custom',
-        prompt: `Dynamic setting changed: ${key} = ${coercedValue} (was ${previous})`,
-        response: `Setting updated to ${coercedValue}`,
-        durationMs: 0,
-        status: 'success',
-        metadata: { key, previous, newValue: coercedValue },
-      });
-
+      
       this.emit('change', key, coercedValue, previous);
       this.emit(`change:${key}`, coercedValue, previous);
 

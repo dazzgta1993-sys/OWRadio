@@ -8,15 +8,12 @@ import { sqlite } from '../db/index.js';
 import config from '../config.js';
 import deezer, { type DeezerTrackMetadata } from './deezer.js';
 import musicbrainz from './musicbrainz.js';
-import vectorCurator from './vectorCurator.js';
-import brainLogger from './brainLogger.js';
 import stationCurator from './stationCurator.js';
 import vetoService from './vetoService.js';
 import featureFlags from './featureFlags.js';
 import dynamicSettings from './dynamicSettings.js';
 import collaborativeGraph from './collaborativeGraph.js';
 import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../utils/trackDedupe.js';
-import { detectTrackLanguage, detectTrackLanguageAsync, LANGUAGE_METADATA, type TrackLanguage } from './languageDetector.js';
 import baselineService from './baselineService.js';
 
 export type CurationEngineType = 'embedding' | 'hybrid' | 'graph' | 'deezer';
@@ -30,17 +27,7 @@ export function getEngine(): CurationEngineType {
 export function setEngine(engine: CurationEngineType): void {
   const previous = currentEngine;
   currentEngine = engine;
-  brainLogger.logInteraction({
-    timestamp: Math.floor(Date.now() / 1000),
-    model: 'engine_switchboard',
-    action: 'custom',
-    prompt: `Operator switch curation engine: [${previous}] -> [${engine}]`,
-    response: JSON.stringify({ previous, activeEngine: engine, timestamp: new Date().toISOString() }, null, 2),
-    durationMs: 1,
-    status: 'success',
-    metadata: { previous, current: engine },
-  });
-  console.log(`[Curator] Curation Engine dynamically switched: ${previous.toUpperCase()} -> ${engine.toUpperCase()}`);
+    console.log(`[Curator] Curation Engine dynamically switched: ${previous.toUpperCase()} -> ${engine.toUpperCase()}`);
 }
 
 export interface CuratedTrackResult {
@@ -185,7 +172,7 @@ export function getActiveLanguageCooldowns(cooldownMinutes?: number): ActiveLang
   const seenLangs = new Set<TrackLanguage>();
 
   for (const row of recent) {
-    const lang = detectTrackLanguage(row.title, row.artist_name);
+    const lang = 'en';
     if (lang !== 'en' && !seenLangs.has(lang)) {
       seenLangs.add(lang);
       const meta = LANGUAGE_METADATA[lang] || { name: lang.toUpperCase(), flag: '🌍' };
@@ -384,7 +371,7 @@ export function isTrackEligibleForAutoplay(
   // Enforces max 1 foreign track per day across the entire station
   const langCooldownMinutes = dynamicSettings.getNumber('curation_language_cooldown_minutes', 1440);
   if (langCooldownMinutes > 0) {
-    const trackLang = detectTrackLanguage(title || '', artistName, undefined, isrc, songId);
+    const trackLang = 'en';
     if (trackLang !== 'en') {
       // 4A. In-memory queue check: no foreign song can enter if any foreign track is already queued
       if (queuedLanguages && queuedLanguages.size > 0) {
@@ -397,7 +384,7 @@ export function isTrackEligibleForAutoplay(
         const recentPlays = stmtRecentPlaysLanguage.all(cutoffLang) as Array<{ title: string; artist_name: string; played_at: number }>;
         const freshMap = new Map<TrackLanguage, { title: string; artist: string; playedAt: number }>();
         for (const row of recentPlays) {
-          const l = detectTrackLanguage(row.title, row.artist_name);
+          const l = 'en';
           if (l !== 'en' && !freshMap.has(l)) {
             freshMap.set(l, { title: row.title, artist: row.artist_name, playedAt: row.played_at });
           }
@@ -432,7 +419,7 @@ export function isForeignLanguageLocked(lang: TrackLanguage, queuedLanguages?: S
     const recentPlays = stmtRecentPlaysLanguage.all(cutoffLang) as Array<{ title: string; artist_name: string; played_at: number }>;
     const freshMap = new Map<TrackLanguage, { title: string; artist: string; playedAt: number }>();
     for (const row of recentPlays) {
-      const l = detectTrackLanguage(row.title, row.artist_name);
+      const l = 'en';
       if (l !== 'en' && !freshMap.has(l)) {
         freshMap.set(l, { title: row.title, artist: row.artist_name, playedAt: row.played_at });
       }
@@ -459,7 +446,7 @@ export async function isCandidateEligibleAsync(
   }
 
   // 2. High-Purity English verification via Last.fm tags + lyrics NLP
-  const lang = await detectTrackLanguageAsync(track.title, track.artist, track.album, track.isrc, track.id);
+  const lang = 'en';
   if (lang !== 'en') {
     if (isForeignLanguageLocked(lang, queuedLanguages)) {
       console.log(`[Curator] 🛑 Foreign track "${track.artist} - ${track.title}" (${lang}) blocked by 24h English purity guardrail.`);
@@ -786,7 +773,7 @@ export async function getNextAutoplayTracks(
     const t = existingQueueTitles[i];
     const a = existingQueueArtists[i] || '';
     if (t && a) {
-      const l = await detectTrackLanguageAsync(t, a);
+      const l = 'en';
       if (l !== 'en') queuedLanguages.add(l);
     }
   }
@@ -812,7 +799,7 @@ export async function getNextAutoplayTracks(
           const normA = normalizeArtist(track.artist).replace(/\s+/g, '');
           if (normA) queuedArtists.add(normA);
           queuedDedupeKeys.add(getTrackDedupeKey(track.title, track.artist));
-          const lang = detectTrackLanguage(track.title, track.artist, undefined, (track as any).isrc, track.id);
+          const lang = 'en'.isrc, track.id);
           if (lang !== 'en') queuedLanguages.add(lang);
           results.push({
             track,
@@ -841,32 +828,12 @@ export async function getNextAutoplayTracks(
         const normA = normalizeArtist(collTrack.track.artist).replace(/\s+/g, '');
         if (normA) queuedArtists.add(normA);
         queuedDedupeKeys.add(getTrackDedupeKey(collTrack.track.title, collTrack.track.artist));
-        const lang = await detectTrackLanguageAsync(collTrack.track.title, collTrack.track.artist, undefined, collTrack.track.isrc, collTrack.track.id);
+        const lang = 'en';
         if (lang !== 'en') queuedLanguages.add(lang);
         results.push(collTrack);
       }
     }
-  } else if (currentEngine === 'embedding') {
-    if (vectorCurator.getIndexedCount() >= 500) {
-      try {
-        const vectorTracks = await vectorCurator.curateNextTracks(
-          roomProfile,
-          memberUserIds,
-          count,
-          queuedSongIds,
-          queuedArtists,
-          queuedLanguages
-        );
-        for (const vt of vectorTracks) {
-          results.push(vt);
-          const lang = await detectTrackLanguageAsync(vt.track.title, vt.track.artist);
-          if (lang !== 'en') queuedLanguages.add(lang);
-        }
-      } catch (err) {
-        console.warn('[Curator] Latent vector curation tier error:', (err as Error).message);
-      }
-    }
-    }
+  } else if (currentEngine === 'embedding') {    }
 
   // --- MusicBrainz & Deezer Discography Discovery (if slots remain) ---
   if (results.length < count && roomProfile.topLikedArtists.length > 0) {
@@ -908,25 +875,11 @@ export async function getNextAutoplayTracks(
     const normA = normalizeArtist(fallbackResult.track.artist).replace(/\s+/g, '');
     if (normA) queuedArtists.add(normA);
     queuedDedupeKeys.add(getTrackDedupeKey(fallbackResult.track.title, fallbackResult.track.artist));
-    const lang = await detectTrackLanguageAsync(fallbackResult.track.title, fallbackResult.track.artist, undefined, fallbackResult.track.isrc, fallbackResult.track.id);
+    const lang = 'en';
     if (lang !== 'en') queuedLanguages.add(lang);
     results.push(fallbackResult);
 
-    brainLogger.logInteraction({
-      timestamp: Math.floor(Date.now() / 1000),
-      model: 'deezer-graph-engine',
-      action: 'tier2_fallback',
-      prompt: `Dynamic Fallback (Room listeners: ${roomProfile.memberCount}, Liked: ${roomProfile.topLikedArtists.join(', ') || 'Eclectic'})`,
-      response: JSON.stringify({
-        track: `${fallbackResult.track.artist} - ${fallbackResult.track.title}`,
-        curatedBy: fallbackResult.curatedBy,
-        reason: fallbackResult.curationReason,
-      }, null, 2),
-      durationMs: 180,
-      status: 'fallback',
-      metadata: { curatedBy: fallbackResult.curatedBy, trackId: fallbackResult.track.id },
-    });
-  }
+      }
 
   // --- Tier 5: Emergency Dead-Air Prevention (Progressive Softening) ---
   if (results.length < count) {

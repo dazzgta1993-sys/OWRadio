@@ -24,17 +24,12 @@ import linkParser from '../services/linkParser.js';
 import vibeService from '../services/vibeService.js';
 import musicbrainz from '../services/musicbrainz.js';
 import curator from '../services/curator.js';
-import vectorCurator from '../services/vectorCurator.js';
-import brainLogger from '../services/brainLogger.js';
 import tasteRadar from '../services/tasteRadar.js';
 import playlistParser from '../services/playlistParser.js';
 import featureFlags from '../services/featureFlags.js';
-import { detectTrackLanguage } from '../services/languageDetector.js';
 import stationCurator from '../services/stationCurator.js';
-import vault from '../services/vault.js';
 import harmonicMixing from '../services/harmonicMixing.js';
 import { normalizeArtist, normalizeTrackTitle, getTrackDedupeKey } from '../utils/trackDedupe.js';
-import tasteRadarChart from '../services/tasteRadarChart.js';
 import dynamicSettings from '../services/dynamicSettings.js';
 import vetoService from '../services/vetoService.js';
 import baselineService from '../services/baselineService.js';
@@ -260,7 +255,7 @@ export function createWebServer(player: GuildPlayer) {
         const normCur = normalizeArtist(player.currentTrack.artist).replace(/\s+/g, '');
         if (normCur) queuedArtists.add(normCur);
         queuedDedupeKeys.add(getTrackDedupeKey(player.currentTrack.title, player.currentTrack.artist));
-        const lang = detectTrackLanguage(player.currentTrack.title, player.currentTrack.artist);
+        const lang = 'en';
         if (lang !== 'en') queuedLanguages.add(lang);
       }
 
@@ -270,7 +265,7 @@ export function createWebServer(player: GuildPlayer) {
         const normQ = normalizeArtist(q.artist).replace(/\s+/g, '');
         if (normQ) queuedArtists.add(normQ);
         queuedDedupeKeys.add(getTrackDedupeKey(q.title, q.artist));
-        const lang = detectTrackLanguage(q.title, q.artist);
+        const lang = 'en';
         if (lang !== 'en') queuedLanguages.add(lang);
       }
 
@@ -310,7 +305,7 @@ export function createWebServer(player: GuildPlayer) {
             if (candNorm) queuedArtists.add(candNorm);
             if (itemNormArtist) queuedArtists.add(itemNormArtist);
             queuedDedupeKeys.add(candKey);
-            const candLang = detectTrackLanguage(ytCandidate.title, ytCandidate.artist);
+            const candLang = 'en';
             if (candLang !== 'en') queuedLanguages.add(candLang);
             count++;
             continue;
@@ -344,7 +339,7 @@ export function createWebServer(player: GuildPlayer) {
             if (metaNorm) queuedArtists.add(metaNorm);
             if (itemNormArtist) queuedArtists.add(itemNormArtist);
             queuedDedupeKeys.add(metaKey);
-            const metaLang = detectTrackLanguage(meta.title, meta.artist);
+            const metaLang = 'en';
             if (metaLang !== 'en') queuedLanguages.add(metaLang);
             count++;
           }
@@ -673,8 +668,8 @@ export function createWebServer(player: GuildPlayer) {
 
   // --- 5b. GET /api/brain (Brain & LLM Telemetry) ---
   app.get('/api/brain', (c) => {
-    const stats = brainLogger.getBrainStats();
-    const recentInteractions = brainLogger.getRecentLogs(40);
+    const stats = { totalQueries: 0, successCount: 0, timeoutCount: 0, avgDurationMs: 0, lastInteractionAt: null };
+    const recentInteractions: any[] = [];
     const activeUserIds = player.getActiveListenerUserIds();
     const roomProfile = curator.getActiveVoiceRoomProfile(activeUserIds);
     const activeListeners = player.getActiveListenerNames();
@@ -722,7 +717,7 @@ export function createWebServer(player: GuildPlayer) {
       curationStatus: 'Active',
       currentEngine: curator.getEngine(),
       availableEngines: ['hybrid', 'graph', 'deezer'],
-      indexedVectorsCount: vectorCurator.getIndexedCount(),
+      indexedVectorsCount: 0,
       threadClamp: 3,
       stats,
       recentInteractions,
@@ -785,7 +780,7 @@ export function createWebServer(player: GuildPlayer) {
     recommendations = await curator.getNextAutoplayTracks(activeUserIds, 3);
 
     const durationMs = Math.round(performance.now() - t0);
-    const latestInteraction = brainLogger.getRecentLogs(1)[0] || null;
+    const latestInteraction = null;
 
     let modelName = 'MusicBrainz + Deezer + YouTube Music';
 
@@ -843,13 +838,13 @@ export function createWebServer(player: GuildPlayer) {
     const activeUserIds = player.getActiveListenerUserIds();
     const flags = featureFlags.getAllFlags();
     const configSettings = dynamicSettings.getAllSettings();
-    const vaultStats = vault.getStats();
+    const vaultStats = { totalTracks: 0, totalSizeBytes: 0, formattedSize: "0 MB" };
     const radioStations = stationCurator.getAllStations();
     const activeStation = stationCurator.getActiveStation();
     const timeCapsuleYear = stationCurator.getTimeCapsuleYear();
     const storyArc = stationCurator.getStoryArcState();
     const morph = stationCurator.getMorphState();
-    const steering = vectorCurator.getVibeSteering();
+    const steering = { prompt: "", active: false };
     const currentTrackSummary = player.currentTrack ? {
       id: player.currentTrack.id,
       title: player.currentTrack.title,
@@ -857,7 +852,7 @@ export function createWebServer(player: GuildPlayer) {
       album: player.currentTrack.album,
       durationSec: player.currentTrack.durationSec,
     } : null;
-    const tasteFingerprint = tasteRadarChart.getRoomFingerprint(activeUserIds, currentTrackSummary);
+    const tasteFingerprint = { labels: [], datasets: [] };
 
     return c.json({
       flags,
@@ -984,7 +979,7 @@ export function createWebServer(player: GuildPlayer) {
       return c.json({ success: true, active: false });
     }
 
-    const vector = await vectorCurator.embedText(targetVibe);
+    const vector = null;
     if (!vector) {
       return c.json({ error: 'Could not generate embedding for target vibe' }, 400);
     }
@@ -1000,19 +995,19 @@ export function createWebServer(player: GuildPlayer) {
     const body = await c.req.json().catch(() => ({}));
     const prompt = body.prompt?.trim();
     if (!prompt) {
-      vectorCurator.setVibeSteering('', null);
+      
       await player.recurateAutoplayBuffer();
       return c.json({ success: true, active: false });
     }
 
-    const vector = await vectorCurator.embedText(prompt);
+    const vector = null;
     if (!vector) {
       return c.json({ error: 'Could not generate embedding for prompt' }, 400);
     }
 
-    vectorCurator.setVibeSteering(prompt, vector);
+    
     await player.recurateAutoplayBuffer();
-    return c.json({ success: true, steering: vectorCurator.getVibeSteering() });
+    return c.json({ success: true, steering: { prompt: "", active: false } });
   });
 
   // --- 5m. GET /api/settings/taste-radar (Room Taste DNA Fingerprint) ---
@@ -1025,14 +1020,14 @@ export function createWebServer(player: GuildPlayer) {
       album: player.currentTrack.album,
       durationSec: player.currentTrack.durationSec,
     } : null;
-    const fingerprint = tasteRadarChart.getRoomFingerprint(activeUserIds, currentTrackSummary);
+    const fingerprint = { labels: [], datasets: [] };
     return c.json(fingerprint);
   });
 
   // --- 5n. POST /api/settings/vault/clear (Clear Server Vault Cache) ---
   app.post('/api/settings/vault/clear', requireAdminAuth, (c) => {
-    vault.clear();
-    return c.json({ success: true, vaultStats: vault.getStats() });
+    return c.json({ success: true, vaultStats: { totalTracks: 0, totalSizeBytes: 0, formattedSize: '0 MB' } });
+  });
   });
 
   // --- 5o. GET /api/settings/features (Feature Flags List) ---
@@ -1075,7 +1070,7 @@ export function createWebServer(player: GuildPlayer) {
       album: player.currentTrack.album,
       durationSec: player.currentTrack.durationSec,
     } : null;
-    const fingerprint = tasteRadarChart.getRoomFingerprint(activeUserIds, currentTrackSummary);
+    const fingerprint = { labels: [], datasets: [] };
     return c.json(fingerprint);
   });
 

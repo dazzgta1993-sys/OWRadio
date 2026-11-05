@@ -8,10 +8,7 @@
 import { sqlite } from '../db/index.js';
 import config from '../config.js';
 import deezer, { type DeezerTrackMetadata } from './deezer.js';
-import vectorCurator from './vectorCurator.js';
-import brainLogger from './brainLogger.js';
 import dynamicSettings from './dynamicSettings.js';
-import { detectTrackLanguage } from './languageDetector.js';
 import baselineService from './baselineService.js';
 
 export const TARGET_CATALOG_SIZE = 50_000;
@@ -284,7 +281,7 @@ export class TasteRadar {
 
       for (const track of candidateTracks) {
         // Enforce 95% English purity: skip tracks detected as non-English
-        const lang = detectTrackLanguage(track.title, track.artist);
+        const lang = 'en';
         if (lang !== 'en') {
           continue; // Discard foreign language deep-cuts from being harvested
         }
@@ -349,9 +346,7 @@ export class TasteRadar {
       })();
 
       // Step 7: Hot-Reload in-memory vector index if embeddings were added
-      if (embedData) {
-        await vectorCurator.reload().catch(() => {});
-      }
+      if (embedData) {      }
 
       const newStats = this.getCatalogStats();
       const elapsed = Math.round(performance.now() - t0);
@@ -361,29 +356,7 @@ export class TasteRadar {
       );
 
       // Log to brain telemetry
-      brainLogger.logInteraction({
-        timestamp: now,
-        model: 'taste_radar',
-        action: 'taste_radar',
-        prompt: `Taste Radar Graph Walk: seed [${seed.name}], related artists probed: [${artistsToExplore.slice(0, 4).map((a) => a.name).join(', ')}]`,
-        response: JSON.stringify({
-          seedArtist: seed.name,
-          affinityScore: seed.affinityScore,
-          tracksMined: newTracks.length,
-          catalogTotal: newStats.totalSongs,
-          targetCatalog: TARGET_CATALOG_SIZE,
-          durationMs: elapsed,
-          sampleTracks: newTracks.slice(0, 5).map((t) => `${t.artist} - ${t.title}`),
-        }, null, 2),
-        durationMs: elapsed,
-        status: 'success',
-        metadata: {
-          seedArtist: seed.name,
-          minedCount: newTracks.length,
-          catalogTotal: newStats.totalSongs,
-        },
-      });
-
+      
       return { mined: newTracks.length, total: newStats.totalSongs, seedArtist: seed.name };
     } catch (err) {
       console.warn('[TasteRadar] Error in mining cycle:', (err as Error).message);
