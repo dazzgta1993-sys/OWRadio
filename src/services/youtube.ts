@@ -124,14 +124,14 @@ function getBaseYtDlpArgs(): string[] {
  */
 export async function searchYouTubeMusic(query: string, limit = 5): Promise<YouTubeTrackMetadata[]> {
   const baseArgs = getBaseYtDlpArgs();
-  const searchArg = `ytmsearch${limit}:${query}`;
+  const searchArg = `ytsearch${limit}:${query} Official Audio`;
 
   try {
     const { stdout } = await execFileAsync('yt-dlp', [
       ...baseArgs,
       '--dump-json',
       '--flat-playlist',
-      '--default-search', 'ytmsearch',
+      '--default-search', 'ytsearch',
       searchArg,
     ], { timeout: 12000, maxBuffer: 10 * 1024 * 1024 });
 
@@ -180,7 +180,7 @@ export async function searchTracks(query: string, limit = 5): Promise<YouTubeTra
 
   // 2. Fallback to standard YouTube search
   const baseArgs = getBaseYtDlpArgs();
-  const searchArg = `ytsearch${limit}:${query}`;
+  const searchArg = `ytsearch${limit}:${query} Official Audio`;
 
   try {
     const { stdout } = await execFileAsync('yt-dlp', [

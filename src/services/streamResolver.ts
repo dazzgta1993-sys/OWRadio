@@ -256,8 +256,8 @@ export async function resolveStream(
 
   // 3a. Prioritize YouTube Music (ytmsearch) for pristine studio albums and official cuts
   try {
-    const ytmQuery = `ytmsearch5:${track.artist} - ${track.title}`;
-    const { stdout } = await execFileAsync('yt-dlp', [...baseArgs, '--default-search', 'ytmsearch', ytmQuery], {
+    const ytmQuery = `ytsearch5:${track.artist} - ${track.title} Topic`;
+    const { stdout } = await execFileAsync('yt-dlp', [...baseArgs, '--default-search', 'ytsearch', ytmQuery], {
       timeout: 8000,
       maxBuffer: 10 * 1024 * 1024,
     });
