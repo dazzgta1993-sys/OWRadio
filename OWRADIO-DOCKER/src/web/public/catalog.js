@@ -140,12 +140,12 @@ function renderState(s) {
   if (el.autoplayBtn) {
     el.autoplayBtn.textContent = s.autoplay !== false ? '🤖 Autoplay: ON' : '🤖 Autoplay: OFF';
   }
-  el.anchorPill.textContent = `⚓ Anchor: ${s.vibeAnchorArtist || 'Auto'}`;
+  el.anchorPill.textContent = `🌐 Engine: ${(s.vibeEngineSource || 'auto').toUpperCase()}`;
   el.playPauseBtn.textContent = s.isPlaying && !s.isPaused ? '⏸' : '▶';
   el.loopBtn.classList.toggle('active', s.loopMode && s.loopMode !== 'off');
   el.loopBtn.title = `Loop Mode: ${(s.loopMode || 'off').toUpperCase()}`;
 
-  el.telAnchor.textContent = s.vibeAnchorArtist || 'Auto Anchor';
+  el.telAnchor.textContent = (s.vibeMode || 'balanced').replace('_', ' ').toUpperCase();
   el.telChain.textContent = `${s.consecutiveAutoplayCount || 0} tracks`;
   el.telDeck2.textContent = s.deck2 ? `${s.deck2.artist} - ${s.deck2.title}` : 'Standby';
   el.telDeck3.textContent = s.deck3 ? `${s.deck3.artist} - ${s.deck3.title}` : 'Standby';
@@ -158,7 +158,7 @@ function renderState(s) {
     el.nowPlayingAlbum.textContent = np.album ? `${np.album}${np.releaseYear ? ' (' + np.releaseYear + ')' : ''}` : '';
     if (np.artworkUrl) el.nowPlayingArt.src = np.artworkUrl;
     el.sourceBadge.textContent = (np.source || 'STUDIO').toUpperCase();
-    el.vibeReasonBadge.textContent = np.vibeReason || s.lastVibeDecision || `⚓ Anchor: ${s.vibeAnchorArtist || np.artist}`;
+    el.vibeReasonBadge.textContent = np.vibeReason || 'Direct Studio Selection';
     const dur = np.duration || 0;
     const elap = s.elapsed || 0;
     el.elapsedTime.textContent = window.formatSecs(elap);

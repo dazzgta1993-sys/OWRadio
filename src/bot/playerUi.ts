@@ -36,7 +36,7 @@ export function buildNowPlayingPayload(player: GuildPlayer) {
   const lines = [
     `**Artist:** ${track.artist}`,
     track.album ? `**Album:** ${track.album}${track.releaseYear ? ` (${track.releaseYear})` : ''}` : '',
-    track.vibeReason ? `**Vibe:** ${track.vibeReason}` : `**Anchor:** ⚓ ${player.vibeAnchorArtist || track.artist}`,
+    `**Source:** ${track.vibeReason || 'Studio Master Selection'}`,
     '',
     `\`${formatTime(elapsed)}\` ${bar} \`${track.formattedDuration}\``,
   ].filter(Boolean);

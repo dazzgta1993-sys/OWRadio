@@ -153,7 +153,7 @@ export async function fetchNextVibeTrack(
           deezerId: p.id, title: p.title, artist: dzArtist.name, artistId: dzArtist.id,
           album: p.album, duration: p.duration, artworkUrl: p.cover || dzArtist.picture,
           isrc: p.isrc, source: 'deezer', isAutoplay: true,
-          requestedBy: 'Vibe DJ (Deep Dive)', vibeReason: `Deep Dive: ${dzArtist.name}`,
+          requestedBy: 'Vibe DJ (Deep Dive)', vibeReason: 'Artist Deep Dive Catalog',
         });
       }
     }
@@ -191,7 +191,7 @@ export async function fetchNextVibeTrack(
           videoId: p.id, deezerId: dzMatch.id, title: dzMatch.title, artist: dzMatch.artist,
           album: dzMatch.album || p.album, duration: dzMatch.duration, artworkUrl: dzMatch.cover || p.thumbnail,
           isrc: dzMatch.isrc, source: 'ytmusic', isAutoplay: true,
-          requestedBy: 'Vibe DJ (YouTube Music)', vibeReason: `YTMusic Song Radio: ${anchorSong?.title || targetArtist}`,
+          requestedBy: 'Vibe DJ (YouTube Music)', vibeReason: 'YouTube Music Studio Radio',
         });
       }
     }
@@ -214,7 +214,7 @@ export async function fetchNextVibeTrack(
           deezerId: p.id, title: p.title, artist: p.artist, artistId: p.artistId,
           album: p.album, duration: p.duration, artworkUrl: p.cover, isrc: p.isrc,
           source: 'deezer', isAutoplay: true,
-          requestedBy: 'Vibe DJ (Deezer Radio)', vibeReason: `Deezer Artist Radio: ${dzArtist.name}`,
+          requestedBy: 'Vibe DJ (Deezer Radio)', vibeReason: 'Deezer Studio Radio',
         });
       }
     }
@@ -232,7 +232,7 @@ export async function fetchNextVibeTrack(
           deezerId: p.id, title: p.title, artist: relPick.name, artistId: relPick.id,
           album: p.album, duration: p.duration, artworkUrl: p.cover || relPick.picture,
           isrc: p.isrc, source: 'deezer', isAutoplay: true,
-          requestedBy: 'Vibe DJ (Deezer Related)', vibeReason: `Deezer Related (3k+ Fans): ${relPick.name}`,
+          requestedBy: 'Vibe DJ (Deezer Related)', vibeReason: 'Deezer Related Circle (3k+ Fans)',
         });
       }
     }
@@ -258,7 +258,7 @@ export async function fetchNextVibeTrack(
           return new AudioTrack({
             title: p.title, artist: p.artist, album: p.album || albPick.title, duration: p.duration,
             artworkUrl: p.cover || albPick.cover, releaseYear: p.year || albPick.year,
-            source: 'musicbrainz', isAutoplay: true, requestedBy: 'Vibe DJ (MusicBrainz)', vibeReason: `MusicBrainz Studio LP: ${albPick.title}`,
+            source: 'musicbrainz', isAutoplay: true, requestedBy: 'Vibe DJ (MusicBrainz)', vibeReason: 'MusicBrainz Studio Discography',
           });
         }
       }
@@ -270,7 +270,7 @@ export async function fetchNextVibeTrack(
       return new AudioTrack({
         title: p.title, artist: p.artist, album: p.album, duration: p.duration,
         artworkUrl: p.cover, releaseYear: p.year, genre: p.genre, source: 'apple',
-        isAutoplay: true, requestedBy: 'Vibe DJ (Apple Music)', vibeReason: `Apple Music Studio: ${lookupArtist}`,
+        isAutoplay: true, requestedBy: 'Vibe DJ (Apple Music)', vibeReason: 'Apple Music Studio Catalog',
       });
     }
     return null;

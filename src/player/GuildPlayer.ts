@@ -176,7 +176,7 @@ export class GuildPlayer extends EventEmitter {
         this.vibeAnchorArtist = extractPrimaryArtist(nextTrack.artist);
         this.vibeAnchorTrack = nextTrack;
         this.consecutiveAutoplayCount = 0;
-        this.lastVibeDecision = `Locked Anchor: ${this.vibeAnchorArtist} — ${nextTrack.title}`;
+        this.lastVibeDecision = 'Direct Studio Selection';
       }
       this.emitStateUpdate();
 
