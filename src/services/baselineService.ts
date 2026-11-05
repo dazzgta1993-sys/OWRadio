@@ -14,18 +14,22 @@ export interface BaselineConfig {
 }
 
 export const DEFAULT_BASELINE_ARTISTS = [
-  'Dua Lipa',
-  'Eminem',
-  'Metallica',
-  'Placebo',
-  'Muse',
-  'Ed Sheeran',
+  'Queen',
+  'Fleetwood Mac',
+  'ABBA',
+  'Michael Jackson',
+  'Toto',
+  'Phil Collins',
+  'Elton John',
+  'David Bowie',
 ];
 
 export const DEFAULT_BASELINE_GENRES = [
-  'hip hop',
-  'pop',
-  'alt rock',
+  'classic rock',
+  'pop rock',
+  '80s pop',
+  'disco',
+  'synthpop',
 ];
 
 export const DEFAULT_BASELINE_WEIGHT = 0.5;

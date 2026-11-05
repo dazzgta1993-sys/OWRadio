@@ -526,7 +526,7 @@ async function getHarmonicDJTrack(
 
     if (candidateArtistNames.length > 0) {
       // Pick from related artists' best catalog tracks
-      const deepCuts = await collaborativeGraph.getDeepCutsForArtists(candidateArtistNames.slice(0, 8), 5, 2);
+      const deepCuts = await collaborativeGraph.getDeepCutsForArtists(candidateArtistNames.slice(0, 8), 5, 0);
       const shuffled = fisherYatesShuffle(deepCuts);
 
       for (const track of shuffled) {
