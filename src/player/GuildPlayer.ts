@@ -272,7 +272,10 @@ export class GuildPlayer extends EventEmitter {
       this.vibeAnchorTrack = this.currentTrack;
       this.lastVibeDecision = `👍 Vibe Locked: ${art} — ${this.currentTrack.title}`;
       console.log(`👍 [Taste] Vibe Locked: ${art} — ${this.currentTrack.title}`);
+      this.deck2Track = null;
+      this.deck3Track = null;
       this.emitStateUpdate();
+      if (this.isPlaying) void this.prewarmDecks();
     }
   }
 

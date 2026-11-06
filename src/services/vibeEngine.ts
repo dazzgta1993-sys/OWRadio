@@ -86,7 +86,7 @@ export async function fetchNextVibeTrack(
 ): Promise<AudioTrack | null> {
   const effectiveSeed =
     seedOverride || ctx.currentTrack || (ctx.history.length > 0 ? ctx.history[ctx.history.length - 1] : null);
-  const { dislikedArtists, dislikedTracks } = getTasteProfile(ctx.guildId);
+  const { likedArtists, dislikedArtists, dislikedTracks } = getTasteProfile(ctx.guildId);
 
   const seenKeys = new Set<string>();
   const seenTitles = new Set<string>();
@@ -133,8 +133,9 @@ export async function fetchNextVibeTrack(
 
   const anchorPrimary = extractPrimaryArtist(ctx.vibeAnchorArtist || '');
   const seedPrimary = extractPrimaryArtist(effectiveSeed?.artist || anchorPrimary || '');
-  const targetArtist =
-    ctx.vibeMode === 'discovery' ? seedPrimary || anchorPrimary : anchorPrimary || seedPrimary;
+  const lovedList = Array.from(likedArtists);
+  const lovedAnchor = lovedList.length > 0 ? pickRandomTop(lovedList, 3) : '';
+  const targetArtist = ctx.vibeMode === 'discovery' ? seedPrimary || anchorPrimary : anchorPrimary || lovedAnchor || seedPrimary;
   const src = ctx.vibeEngineSource || 'auto';
   const poolCap = ctx.vibeMode === 'discovery' ? 10 : 6;
   const anchorSong = ctx.vibeAnchorTrack || effectiveSeed;

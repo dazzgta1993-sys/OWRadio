@@ -145,10 +145,18 @@ export async function resolvePrimaryDeezerArtist(artistQuery: string): Promise<D
 
   for (const cand of candidatesToTry) {
     if (!cand) continue;
-    const found = await searchDeezerArtists(cand, 5);
-    const verified = found.find((a) => a.fans >= 500);
-    if (verified) return verified;
-    if (found.length > 0 && parts.length === 1) return found[0];
+    const qNorm = normalizeNameForMatch(cand);
+    const found = await searchDeezerArtists(cand, 6);
+    const exact = found.find((a) => normalizeNameForMatch(a.name) === qNorm);
+    if (exact) return exact;
+    const close = found.find((a) => {
+      const aNorm = normalizeNameForMatch(a.name);
+      return (aNorm.includes(qNorm) || qNorm.includes(aNorm)) && Math.abs(aNorm.length - qNorm.length) <= 3;
+    });
+    if (close) return close;
+    if (found.length > 0 && parts.length === 1 && normalizeNameForMatch(found[0].name).startsWith(qNorm.slice(0, 5))) {
+      return found[0];
+    }
   }
   return null;
 }

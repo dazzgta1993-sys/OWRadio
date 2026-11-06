@@ -9,7 +9,7 @@ import { joinVoiceChannel, DiscordGatewayAdapterCreator } from '@discordjs/voice
 import config from '../config.js';
 import globalPlayer from '../player/GuildPlayer.js';
 import AudioTrack from '../player/AudioTrack.js';
-import { getRecentHistory } from '../db/store.js';
+import { getRecentHistory, getTasteProfile } from '../db/store.js';
 import { extractPrimaryArtist } from '../utils/artistNormalizer.js';
 
 export async function runAutoResume(client: Client): Promise<void> {
@@ -38,11 +38,19 @@ export async function runAutoResume(client: Client): Promise<void> {
           lastManualTrack = trk;
         }
       }
+      const taste = getTasteProfile('global');
+      const lovedList = Array.from(taste.likedArtists);
       const anchorSource = lastManualTrack || globalPlayer.history[globalPlayer.history.length - 1];
-      if (anchorSource && !globalPlayer.vibeAnchorArtist) {
-        globalPlayer.vibeAnchorArtist = extractPrimaryArtist(anchorSource.artist);
-        globalPlayer.vibeAnchorTrack = anchorSource;
-        console.log(`⚓ [AutoResume] Restored Vibe Anchor: ${globalPlayer.vibeAnchorArtist} — ${anchorSource.title}`);
+      if (!globalPlayer.vibeAnchorArtist) {
+        if (lovedList.length > 0) {
+          globalPlayer.vibeAnchorArtist = lovedList[lovedList.length - 1];
+          globalPlayer.vibeAnchorTrack = anchorSource;
+          console.log(`⚓ [AutoResume] Restored Vibe Anchor from Loved Vibes: ${globalPlayer.vibeAnchorArtist}`);
+        } else if (anchorSource) {
+          globalPlayer.vibeAnchorArtist = extractPrimaryArtist(anchorSource.artist);
+          globalPlayer.vibeAnchorTrack = anchorSource;
+          console.log(`⚓ [AutoResume] Restored Vibe Anchor: ${globalPlayer.vibeAnchorArtist} — ${anchorSource.title}`);
+        }
       }
     }
   } catch {}
