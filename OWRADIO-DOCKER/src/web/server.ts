@@ -51,7 +51,9 @@ app.get('/stream.mp3', (c) => {
   return stream(c, async (s) => {
     const mp3Client = globalPlayer.broadcastTee.addMp3Client();
     s.onAbort(() => { mp3Client.destroy(); });
-    for await (const chunk of mp3Client) await s.write(chunk as Uint8Array);
+    try {
+      for await (const chunk of mp3Client) await s.write(chunk as Uint8Array);
+    } catch {}
   });
 });
 
