@@ -43,8 +43,13 @@ export async function runAutoResume(client: Client): Promise<void> {
       const anchorSource = lastManualTrack || globalPlayer.history[globalPlayer.history.length - 1];
       if (!globalPlayer.vibeAnchorArtist) {
         if (lovedList.length > 0) {
-          globalPlayer.vibeAnchorArtist = lovedList[lovedList.length - 1];
-          globalPlayer.vibeAnchorTrack = anchorSource;
+          const loved = lovedList[lovedList.length - 1];
+          globalPlayer.vibeAnchorArtist = loved;
+          if (anchorSource && extractPrimaryArtist(anchorSource.artist).toLowerCase() === loved.toLowerCase()) {
+            globalPlayer.vibeAnchorTrack = anchorSource;
+          } else {
+            globalPlayer.vibeAnchorTrack = null;
+          }
           console.log(`⚓ [AutoResume] Restored Vibe Anchor from Loved Vibes: ${globalPlayer.vibeAnchorArtist}`);
         } else if (anchorSource) {
           globalPlayer.vibeAnchorArtist = extractPrimaryArtist(anchorSource.artist);
