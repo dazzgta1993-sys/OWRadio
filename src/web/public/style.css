@@ -182,3 +182,16 @@ body {
 .album-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; background: #0e1017; }
 .album-card-title { font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .album-card-meta { font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; }
+
+@media (max-width: 1240px) {
+  .topbar { padding: 10px 14px; gap: 10px; }
+  .brand-sub { display: none; }
+  .source-select { max-width: 140px; padding: 6px 8px; font-size: 11px; }
+  .btn { padding: 6px 10px; font-size: 11px; }
+  .status-pills { flex-shrink: 0; gap: 6px; }
+  .pill { font-size: 10px; padding: 4px 8px; }
+}
+@media (max-width: 1024px) {
+  .search-box { min-width: 140px; }
+  #broadcastPill { display: none; }
+}
