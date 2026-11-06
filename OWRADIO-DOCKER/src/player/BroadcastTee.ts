@@ -113,8 +113,6 @@ export class BroadcastTee {
       '1',
       '-reconnect_delay_max',
       '5',
-      '-buffer_size',
-      '1048576',
       '-probesize',
       '131072',
       '-analyzeduration',
