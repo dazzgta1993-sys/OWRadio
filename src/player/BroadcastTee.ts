@@ -92,7 +92,7 @@ export class BroadcastTee {
     this.stopTrackStream();
     this.isPaused = false;
 
-    const discordPass = new PassThrough({ highWaterMark: 19200 });
+    const discordPass = new PassThrough({ highWaterMark: 192000 });
     discordPass.on('error', () => {});
     this.activeDiscordStream = discordPass;
 
@@ -104,7 +104,7 @@ export class BroadcastTee {
     const beforeArgs: string[] = [
       '-hide_banner',
       '-loglevel',
-      'error',
+      'warning',
       '-reconnect',
       '1',
       '-reconnect_streamed',
@@ -113,10 +113,12 @@ export class BroadcastTee {
       '1',
       '-reconnect_delay_max',
       '5',
+      '-buffer_size',
+      '1048576',
       '-probesize',
-      '65536',
+      '131072',
       '-analyzeduration',
-      '100000',
+      '200000',
       '-nostdin',
     ];
 
@@ -140,6 +142,13 @@ export class BroadcastTee {
 
     const decoder = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.trackDecoder = decoder;
+
+    decoder.stderr?.on('data', (d: Buffer) => {
+      const msg = d.toString().trim();
+      if (/reconnect|drop|stalled|corrupt/i.test(msg)) {
+        console.warn(`⚠️ [Audio Pipeline] Remote stream notice: ${msg.split('\n')[0]}`);
+      }
+    });
 
     decoder.stdout?.on('data', (chunk: Buffer) => {
       const scaled = this.applyVolumeAndMeter(chunk);

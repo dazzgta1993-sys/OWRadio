@@ -65,9 +65,10 @@ export class GuildPlayer extends EventEmitter {
     this.broadcastTee = new BroadcastTee();
     this.vibeMode = (getRuntimeSetting('vibe_mode', 'balanced') as VibeMode) || 'balanced';
     this.vibeEngineSource = (getRuntimeSetting('vibe_engine_source', 'auto') as VibeEngineSource) || 'auto';
-    this.audioPlayer = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play } });
+    this.audioPlayer = createAudioPlayer({ behaviors: { noSubscriber: NoSubscriberBehavior.Play, maxMissedFrames: 250 } });
     this.audioPlayer.on(AudioPlayerStatus.Idle, () => { if (!this.suppressIdleEvent) void this.playNext(); });
-    this.audioPlayer.on('error', () => { if (!this.suppressIdleEvent) void this.playNext(); });
+    this.audioPlayer.on(AudioPlayerStatus.AutoPaused, () => console.warn('⚠️ [Discord Voice] AutoPaused: connection jitter buffer underrun'));
+    this.audioPlayer.on('error', (err) => { console.warn('⚠️ [Discord Voice] Resource error:', err.message); if (!this.suppressIdleEvent) void this.playNext(); });
   }
 
   public attachVoiceConnection(conn: VoiceConnection): void {

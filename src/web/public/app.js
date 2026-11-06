@@ -109,6 +109,12 @@ el.listenLiveBtn.addEventListener('click', () => {
     el.listenLiveBtn.classList.remove('active');
   }
 });
+el.browserAudio.addEventListener('waiting', () => {
+  if (isListeningInBrowser) el.listenLiveBtn.textContent = '⏳ Re-buffering Audio...';
+});
+el.browserAudio.addEventListener('playing', () => {
+  if (isListeningInBrowser) el.listenLiveBtn.textContent = '🎧 Streaming Live (Click to Mute)';
+});
 
 // --- Search & Direct Play / Queue ---
 window.triggerPlayOrQueue = async function (payload, mode = 'now') {
