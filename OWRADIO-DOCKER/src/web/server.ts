@@ -185,9 +185,10 @@ app.post('/api/play', async (c) => {
   const mode: 'now' | 'queue' = body.mode === 'queue' ? 'queue' : 'now';
 
   if (body.track && body.track.title) {
+    const rawId = String(body.track.videoId || body.track.id || '').trim();
     const trk = new AudioTrack({
-      videoId: body.track.videoId || body.track.id?.replace(/^yt_/, ''),
-      deezerId: body.track.deezerId,
+      videoId: rawId.startsWith('yt_') ? rawId.replace(/^yt_/, '') : (body.track.videoId || ''),
+      deezerId: body.track.deezerId || (rawId.startsWith('dz_') ? rawId.replace(/^dz_/, '') : undefined),
       title: body.track.title,
       artist: body.track.artist || 'Unknown Artist',
       album: body.track.album || '',

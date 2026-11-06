@@ -93,6 +93,7 @@ export class BroadcastTee {
     this.isPaused = false;
 
     const discordPass = new PassThrough({ highWaterMark: 19200 });
+    discordPass.on('error', () => {});
     this.activeDiscordStream = discordPass;
 
     const headerLines = Object.entries(headers)

@@ -61,8 +61,9 @@ export class AudioTrack {
   public streamExpiresAt?: number;
 
   constructor(init: AudioTrackInit) {
-    this.videoId = (init.videoId || '').replace(/^yt_/, '').trim();
-    this.deezerId = init.deezerId;
+    const rawVid = (init.videoId || (init.id?.startsWith('yt_') ? init.id : '')).replace(/^yt_/, '').trim();
+    this.videoId = rawVid && !/^(dz_|trk_|chart_|mb_)/i.test(rawVid) ? rawVid : '';
+    this.deezerId = init.deezerId || (init.id?.startsWith('dz_') ? init.id.replace(/^dz_/, '') : undefined);
     this.id = init.id || (this.videoId ? `yt_${this.videoId}` : `trk_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
     this.title = (init.title || 'Unknown Title').trim();
     this.artist = (init.artist || 'Unknown Artist').trim();

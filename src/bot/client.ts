@@ -11,6 +11,7 @@ import {
   Routes,
   SlashCommandBuilder,
   GuildMember,
+  Events,
 } from 'discord.js';
 import { joinVoiceChannel, DiscordGatewayAdapterCreator } from '@discordjs/voice';
 import config from '../config.js';
@@ -134,7 +135,7 @@ function connectMemberVoiceIfNeeded(member: GuildMember | null): void {
   }
 }
 
-discordClient.once('ready', async () => {
+discordClient.once(Events.ClientReady, async () => {
   console.log(`🤖 [Discord] Logged in as ${discordClient.user?.tag}`);
   if (config.DISCORD_TOKEN && discordClient.user) {
     const rest = new REST({ version: '10' }).setToken(config.DISCORD_TOKEN);
