@@ -189,6 +189,22 @@ document.addEventListener('click', (e) => {
 
 // --- Transport Controls ---
 const sendAction = async (act) => {
+  if (isListeningInBrowser && el.browserAudio) {
+    if (act === 'stop') {
+      el.browserAudio.pause();
+      el.browserAudio.src = '';
+    } else if (act === 'toggle') {
+      if (!el.browserAudio.paused) el.browserAudio.pause();
+      else el.browserAudio.play().catch(() => {});
+    } else if (act === 'skip' || act === 'dislike') {
+      setTimeout(() => {
+        if (isListeningInBrowser && el.browserAudio) {
+          el.browserAudio.src = `/stream.mp3?t=${Date.now()}`;
+          el.browserAudio.play().catch(() => {});
+        }
+      }, 400);
+    }
+  }
   try {
     const res = await fetch(`/api/player/${act}`, { method: 'POST' });
     const data = await res.json();
