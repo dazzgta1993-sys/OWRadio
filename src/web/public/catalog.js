@@ -26,26 +26,25 @@ window.el.nowPlayingArtist.addEventListener('click', () => {
 // --- Official UK / US / Global Charts ---
 async function loadOfficialCharts(country = 'gb') {
   window.el.chartsList.innerHTML = '<div style="padding:16px;color:#9ca3af;">Loading Official Top 40...</div>';
-  const res = await fetch(`/api/charts?country=${country}`);
-  const data = await res.json();
-  const tracks = data.tracks || [];
-  window.el.chartsList.innerHTML = tracks.map((t, i) => `
-    <div class="track-row">
-      <div class="track-row-left">
-        <span style="width:24px;color:#9ca3af;font-weight:700;">#${i + 1}</span>
-        <img src="${window.escapeHtml(t.cover)}" alt="" />
-        <div>
-          <div class="track-row-title">${window.escapeHtml(t.title)}</div>
-          <div class="track-row-sub">${window.escapeHtml(t.artist)}${t.album ? ' • ' + window.escapeHtml(t.album) : ''}</div>
+  try {
+    const res = await fetch(`/api/charts?country=${country}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const tracks = data.tracks || [];
+    window.el.chartsList.innerHTML = tracks.length ? tracks.map((t, i) => `
+      <div class="track-row">
+        <div class="track-row-left">
+          <span style="width:24px;color:#9ca3af;font-weight:700;">#${i + 1}</span>
+          <img src="${window.escapeHtml(t.cover)}" alt="" />
+          <div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist)}${t.album ? ' • ' + window.escapeHtml(t.album) : ''}</div></div>
         </div>
-      </div>
-      <div class="track-row-actions">
-        <button class="btn btn-primary chart-play" data-idx="${i}">▶ Play</button>
-        <button class="btn btn-secondary chart-queue" data-idx="${i}">+ Queue</button>
-      </div>
-    </div>`).join('');
-  window.el.chartsList.querySelectorAll('.chart-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: tracks[Number(b.dataset.idx)] }, 'now')));
-  window.el.chartsList.querySelectorAll('.chart-queue').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: tracks[Number(b.dataset.idx)] }, 'queue')));
+        <div class="track-row-actions"><button class="btn btn-primary chart-play" data-idx="${i}">▶ Play</button><button class="btn btn-secondary chart-queue" data-idx="${i}">+ Queue</button></div>
+      </div>`).join('') : '<div style="padding:16px;color:#9ca3af;">No chart tracks available.</div>';
+    window.el.chartsList.querySelectorAll('.chart-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: tracks[Number(b.dataset.idx)] }, 'now')));
+    window.el.chartsList.querySelectorAll('.chart-queue').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: tracks[Number(b.dataset.idx)] }, 'queue')));
+  } catch (err) {
+    window.el.chartsList.innerHTML = `<div style="padding:16px;color:#f87171;">⚠️ Failed to load charts. <button class="btn btn-small" onclick="loadOfficialCharts('${country}')">Retry</button></div>`;
+  }
 }
 
 document.querySelectorAll('.chart-country-btn').forEach((btn) =>
@@ -67,11 +66,16 @@ async function loadArtistDiscography(artist) {
   if (!q) return;
   document.getElementById('albumTracklistPanel')?.classList.add('hidden');
   window.el.discoList.innerHTML = '<div style="padding:16px;color:#9ca3af;">Querying MusicBrainz & Studio Catalogs...</div>';
-  const res = await fetch(`/api/discography?artist=${encodeURIComponent(q)}`);
-  const data = await res.json();
-  cachedDiscoArtist = data.artist || q;
-  cachedDiscoAlbums = data.albums || [];
-  renderDiscographyGrid();
+  try {
+    const res = await fetch(`/api/discography?artist=${encodeURIComponent(q)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    cachedDiscoArtist = data.artist || q;
+    cachedDiscoAlbums = data.albums || [];
+    renderDiscographyGrid();
+  } catch (err) {
+    window.el.discoList.innerHTML = `<div style="padding:16px;color:#f87171;">⚠️ Discography lookup failed (${window.escapeHtml(err.message)}). <button class="btn btn-small" onclick="loadArtistDiscography('${window.escapeHtml(q)}')">Retry</button></div>`;
+  }
 }
 
 async function openAlbumTracklist(alb) {
@@ -79,43 +83,35 @@ async function openAlbumTracklist(alb) {
   if (!panel) return;
   panel.classList.remove('hidden');
   panel.innerHTML = `<div class="setting-box"><div style="color:#9ca3af;">⏳ Loading studio tracklist for <b>${window.escapeHtml(alb.title)}</b>...</div></div>`;
-  const params = new URLSearchParams({ artist: cachedDiscoArtist, album: alb.title, mbid: alb.mbid || '', deezerAlbumId: alb.deezerAlbumId || '' });
-  const res = await fetch(`/api/album-tracks?${params.toString()}`);
-  const data = await res.json();
-  const tracks = data.tracks || [];
-  panel.innerHTML = `
-    <div class="setting-box" style="border-color:var(--accent);">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap;">
-        <div>
-          <h3 style="margin:0;">💿 ${window.escapeHtml(alb.title)} (${window.escapeHtml(alb.year || 'LP')})</h3>
-          <div style="font-size:11px;color:#9ca3af;">${window.escapeHtml(cachedDiscoArtist)} • ${window.escapeHtml(alb.category)} • ${tracks.length} tracks</div>
+  try {
+    const params = new URLSearchParams({ artist: cachedDiscoArtist, album: alb.title, mbid: alb.mbid || '', deezerAlbumId: alb.deezerAlbumId || '' });
+    const res = await fetch(`/api/album-tracks?${params.toString()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const tracks = data.tracks || [];
+    panel.innerHTML = `
+      <div class="setting-box" style="border-color:var(--accent);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:10px;flex-wrap:wrap;">
+          <div><h3 style="margin:0;">💿 ${window.escapeHtml(alb.title)} (${window.escapeHtml(alb.year || 'LP')})</h3><div style="font-size:11px;color:#9ca3af;">${window.escapeHtml(cachedDiscoArtist)} • ${window.escapeHtml(alb.category)} • ${tracks.length} tracks</div></div>
+          <div style="display:flex;gap:6px;"><button id="tlPlayAll" class="btn btn-primary">▶ Play Album</button><button id="tlQueueAll" class="btn btn-secondary">+ Queue Album</button><button id="tlClose" class="btn btn-small">✕ Close</button></div>
         </div>
-        <div style="display:flex;gap:6px;">
-          <button id="tlPlayAll" class="btn btn-primary">▶ Play Album</button>
-          <button id="tlQueueAll" class="btn btn-secondary">+ Queue Album</button>
-          <button id="tlClose" class="btn btn-small">✕ Close</button>
+        <div class="track-list" style="max-height:240px;">
+          ${tracks.length ? tracks.map((t, idx) => `
+            <div class="track-row">
+              <div class="track-row-left"><span style="width:22px;color:#9ca3af;font-weight:700;">${t.trackNumber || idx + 1}.</span><div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist || cachedDiscoArtist)}</div></div></div>
+              <div class="track-row-actions"><span style="font-size:11px;color:#9ca3af;">${t.duration ? window.formatSecs(t.duration) : ''}</span><button class="btn btn-primary tl-play" data-idx="${idx}">▶ Play</button><button class="btn btn-secondary tl-queue" data-idx="${idx}">+Q</button></div>
+            </div>`).join('') : '<div style="padding:10px;color:#9ca3af;">No individual tracklist found.</div>'}
         </div>
-      </div>
-      <div class="track-list" style="max-height:240px;">
-        ${tracks.length ? tracks.map((t, idx) => `
-          <div class="track-row">
-            <div class="track-row-left">
-              <span style="width:22px;color:#9ca3af;font-weight:700;">${t.trackNumber || idx + 1}.</span>
-              <div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist || cachedDiscoArtist)}</div></div>
-            </div>
-            <div class="track-row-actions">
-              <span style="font-size:11px;color:#9ca3af;">${t.duration ? window.formatSecs(t.duration) : ''}</span>
-              <button class="btn btn-primary tl-play" data-idx="${idx}">▶ Play</button>
-              <button class="btn btn-secondary tl-queue" data-idx="${idx}">+Q</button>
-            </div>
-          </div>`).join('') : '<div style="padding:10px;color:#9ca3af;">No individual tracklist found.</div>'}
-      </div>
-    </div>`;
-  document.getElementById('tlClose')?.addEventListener('click', () => panel.classList.add('hidden'));
-  document.getElementById('tlPlayAll')?.addEventListener('click', () => triggerAlbumAction(alb, 'now'));
-  document.getElementById('tlQueueAll')?.addEventListener('click', () => triggerAlbumAction(alb, 'queue'));
-  panel.querySelectorAll('.tl-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: { ...tracks[Number(b.dataset.idx)], album: alb.title, cover: tracks[Number(b.dataset.idx)].cover || alb.cover } }, 'now')));
-  panel.querySelectorAll('.tl-queue').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: { ...tracks[Number(b.dataset.idx)], album: alb.title, cover: tracks[Number(b.dataset.idx)].cover || alb.cover } }, 'queue')));
+      </div>`;
+    document.getElementById('tlClose')?.addEventListener('click', () => panel.classList.add('hidden'));
+    document.getElementById('tlPlayAll')?.addEventListener('click', () => triggerAlbumAction(alb, 'now'));
+    document.getElementById('tlQueueAll')?.addEventListener('click', () => triggerAlbumAction(alb, 'queue'));
+    panel.querySelectorAll('.tl-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: { ...tracks[Number(b.dataset.idx)], album: alb.title, cover: tracks[Number(b.dataset.idx)].cover || alb.cover } }, 'now')));
+    panel.querySelectorAll('.tl-queue').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: { ...tracks[Number(b.dataset.idx)], album: alb.title, cover: tracks[Number(b.dataset.idx)].cover || alb.cover } }, 'queue')));
+  } catch (err) {
+    panel.innerHTML = `<div class="setting-box"><div style="color:#f87171;">⚠️ Failed to load tracklist (${window.escapeHtml(err.message)}). <button class="btn btn-small" id="tlCloseErr">✕ Close</button></div></div>`;
+    document.getElementById('tlCloseErr')?.addEventListener('click', () => panel.classList.add('hidden'));
+  }
 }
 
 function renderDiscographyGrid() {
@@ -155,6 +151,7 @@ const postVibe = async (payload) => {
 document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((btn) => btn.addEventListener('click', () => postVibe({ mode: btn.dataset.mode })));
 document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((btn) => btn.addEventListener('click', () => postVibe({ engine: btn.dataset.engine })));
 
+let lastQueueSig = '', lastHistSig = '', lastTasteSig = '';
 // --- Render Live State ---
 function renderState(s) {
   if (!s) return;
@@ -205,73 +202,54 @@ function renderState(s) {
 
   const qList = s.queue || [];
   el.queueCount.textContent = String(qList.length);
-  el.queueList.innerHTML = qList.length
-    ? qList.map((t, i) => `
+  const qSig = qList.map((t) => `${t.id || t.title}:${t.isPrewarmed ? 1 : 0}`).join('|');
+  if (qSig !== lastQueueSig) {
+    lastQueueSig = qSig;
+    el.queueList.innerHTML = qList.length ? qList.map((t, i) => `
       <div class="track-row">
-        <div class="track-row-left">
-          <span style="width:20px;color:#9ca3af;">${i + 1}</span>
-          <img src="${window.escapeHtml(t.artworkUrl || '')}" alt="" />
-          <div>
-            <div class="track-row-title">${window.escapeHtml(t.title)}</div>
-            <div class="track-row-sub">${window.escapeHtml(t.artist)}${t.vibeReason ? ' • ' + window.escapeHtml(t.vibeReason) : ''}</div>
-          </div>
-        </div>
-        <div class="track-row-actions">
-          <span style="font-size:11px;color:#9ca3af;">${window.escapeHtml(t.durationFormatted || window.formatSecs(t.duration))}</span>
-          <button class="btn btn-primary q-play" data-idx="${i}" title="Play Now">▶</button>
-          <button class="btn btn-small q-remove" data-idx="${i}" title="Remove">✕</button>
-        </div>
-      </div>`).join('')
-    : '<div style="padding:20px;color:#9ca3af;text-align:center;">Queue is clear — Autoplay Vibe Engine will cue Deck 2 & Deck 3 automatically once a song plays.</div>';
+        <div class="track-row-left"><span style="width:20px;color:#9ca3af;">${i + 1}</span><img src="${window.escapeHtml(t.artworkUrl || '')}" alt="" /><div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist)}${t.vibeReason ? ' • ' + window.escapeHtml(t.vibeReason) : ''}</div></div></div>
+        <div class="track-row-actions"><span style="font-size:11px;color:#9ca3af;">${window.escapeHtml(t.durationFormatted || window.formatSecs(t.duration))}</span><button class="btn btn-primary q-play" data-idx="${i}">▶</button><button class="btn btn-small q-remove" data-idx="${i}">✕</button></div>
+      </div>`).join('') : '<div style="padding:20px;color:#9ca3af;text-align:center;">Queue is clear — Autoplay Vibe Engine will cue Deck 2 & Deck 3 automatically.</div>';
+    el.queueList.querySelectorAll('.q-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: qList[Number(b.dataset.idx)] }, 'now')));
+    el.queueList.querySelectorAll('.q-remove').forEach((b) => b.addEventListener('click', async () => { const res = await fetch(`/api/queue/${b.dataset.idx}`, { method: 'DELETE' }); const data = await res.json(); if (data.state) renderState(data.state); }));
+  }
 
-  el.queueList.querySelectorAll('.q-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: qList[Number(b.dataset.idx)] }, 'now')));
-  el.queueList.querySelectorAll('.q-remove').forEach((b) =>
-    b.addEventListener('click', async () => {
-      const res = await fetch(`/api/queue/${b.dataset.idx}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.state) renderState(data.state);
-    })
-  );
-
-  el.historyList.innerHTML = (s.history || []).map((t, idx) => `
-    <div class="track-row">
-      <div class="track-row-left">
-        <img src="${window.escapeHtml(t.artworkUrl || '')}" alt="" />
-        <div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist)}</div></div>
-      </div>
-      <div class="track-row-actions"><button class="btn btn-primary hist-play" data-idx="${idx}">▶ Replay</button></div>
-    </div>`).join('');
-  el.historyList.querySelectorAll('.hist-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: s.history[Number(b.dataset.idx)] }, 'now')));
+  const hList = s.history || [];
+  const hSig = hList.map((t) => t.id || t.title).join('|');
+  if (hSig !== lastHistSig) {
+    lastHistSig = hSig;
+    el.historyList.innerHTML = hList.map((t, idx) => `
+      <div class="track-row">
+        <div class="track-row-left"><img src="${window.escapeHtml(t.artworkUrl || '')}" alt="" /><div><div class="track-row-title">${window.escapeHtml(t.title)}</div><div class="track-row-sub">${window.escapeHtml(t.artist)}</div></div></div>
+        <div class="track-row-actions"><button class="btn btn-primary hist-play" data-idx="${idx}">▶ Replay</button></div>
+      </div>`).join('');
+    el.historyList.querySelectorAll('.hist-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: hList[Number(b.dataset.idx)] }, 'now')));
+  }
 
   document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === s.vibeMode));
   document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.engine === s.vibeEngineSource));
 
   const likedEl = document.getElementById('likedList');
   const dislikedEl = document.getElementById('dislikedList');
-  if (likedEl && s.taste) {
-    const liked = s.taste.likedArtists || [];
-    likedEl.innerHTML = liked.length
-      ? liked.map((k) => `<span class="pill pill-live" style="display:inline-flex;align-items:center;gap:6px;">👍 ${window.escapeHtml(k)} <button class="taste-rm" data-key="${window.escapeHtml(k)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
-      : '<span style="font-size:12px;color:#9ca3af;">No locked vibes yet — click 👍 Lock Vibe on any track.</span>';
+  const tSig = s.taste ? JSON.stringify(s.taste) : '';
+  if (tSig !== lastTasteSig) {
+    lastTasteSig = tSig;
+    if (likedEl && s.taste) {
+      const liked = s.taste.likedArtists || [];
+      likedEl.innerHTML = liked.length ? liked.map((k) => `<span class="pill pill-live" style="display:inline-flex;align-items:center;gap:6px;">👍 ${window.escapeHtml(k)} <button class="taste-rm" data-key="${window.escapeHtml(k)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No locked vibes yet — click 👍 Lock Vibe on any track.</span>';
+    }
+    if (dislikedEl && s.taste) {
+      const cds = s.taste.cooldowns || [];
+      const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
+      dislikedEl.innerHTML = cds.length ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No active cooldowns.</span>';
+    }
+    document.querySelectorAll('.taste-rm').forEach((b) => b.addEventListener('click', async () => { const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) }); const data = await res.json(); if (data.state) renderState(data.state); }));
   }
-  if (dislikedEl && s.taste) {
-    const cds = s.taste.cooldowns || [];
-    const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
-    dislikedEl.innerHTML = cds.length
-      ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('')
-      : '<span style="font-size:12px;color:#9ca3af;">No active artist or song cooldowns.</span>';
-  }
-  document.querySelectorAll('.taste-rm').forEach((b) =>
-    b.addEventListener('click', async () => {
-      const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) });
-      const data = await res.json();
-      if (data.state) renderState(data.state);
-    })
-  );
 }
 window.renderState = renderState;
+if (window.pendingState) { renderState(window.pendingState); window.pendingState = null; }
 
-fetch('/api/nowplaying').then((r) => r.json()).then(renderState).catch(() => {});
+fetch('/api/nowplaying').then((r) => r.ok ? r.json() : null).then((d) => d && renderState(d)).catch(() => {});
 setInterval(() => {
   const s = window.currentShow;
   if (s && s.isPlaying && !s.isPaused && s.nowPlaying) {
@@ -287,3 +265,4 @@ setInterval(() => {
 
 const evtSource = new EventSource('/api/events');
 evtSource.addEventListener('state', (e) => { try { renderState(JSON.parse(e.data)); } catch {} });
+evtSource.onerror = () => { setTimeout(() => fetch('/api/nowplaying').then((r) => r.ok ? r.json() : null).then((d) => d && renderState(d)).catch(() => {}), 3000); };

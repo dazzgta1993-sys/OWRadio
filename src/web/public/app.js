@@ -1,3 +1,4 @@
+window.renderState = window.renderState || function (s) { window.pendingState = s; };
 /**
  * @file web/public/app.js
  * @description Core Player, Live 192kbps Audio Stream, Volume Slider, Multi-Engine Search,
@@ -68,6 +69,7 @@ window.escapeHtml = function (str) {
 };
 
 // --- Volume Control (Local Browser Audio + Server Broadcast Gain) ---
+let volumeSyncDebounce = null;
 function applyVolume(volPercent, syncServer = true) {
   const clamped = Math.max(0, Math.min(100, Math.round(Number(volPercent) || 0)));
   savedVolume = clamped;
@@ -80,11 +82,14 @@ function applyVolume(volPercent, syncServer = true) {
     el.browserAudio.muted = clamped === 0;
   }
   if (syncServer) {
-    fetch('/api/player/volume', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ volume: clamped }),
-    }).catch(() => {});
+    clearTimeout(volumeSyncDebounce);
+    volumeSyncDebounce = setTimeout(() => {
+      fetch('/api/player/volume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ volume: clamped }),
+      }).catch(() => {});
+    }, 150);
   }
 }
 
@@ -167,9 +172,12 @@ function runLiveSearch() {
     return;
   }
   searchDebounce = setTimeout(async () => {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=${encodeURIComponent(el.searchSource.value)}`);
-    const data = await res.json();
-    renderSearchDropdown(data.results || []);
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}&source=${encodeURIComponent(el.searchSource.value)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      renderSearchDropdown(data.results || []);
+    } catch {}
   }, 240);
 }
 
