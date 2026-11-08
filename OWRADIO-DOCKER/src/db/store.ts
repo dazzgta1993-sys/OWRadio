@@ -59,6 +59,7 @@ export function setApiCache(key: string, data: any, ttlSeconds = 1800, namespace
       if (v.expiresAt <= now) memApiCache.delete(k);
     }
     if (memApiCache.size > 400) memApiCache.clear();
+    try { sqlite.prepare('DELETE FROM api_cache WHERE expires_at <= ?').run(now); } catch {}
   }
   memApiCache.set(key, { data, expiresAt });
   try {
@@ -177,6 +178,7 @@ export function recordTasteFeedback(artist: string, title: string, vote: 'up' | 
   const artKey = (artist || '').trim().toLowerCase();
   const trkKey = `${artKey} - ${(title || '').trim().toLowerCase()}`;
   try {
+    sqlite.exec('BEGIN IMMEDIATE');
     if (artKey) {
       sqlite
         .prepare(
@@ -195,7 +197,10 @@ export function recordTasteFeedback(artist: string, title: string, vote: 'up' | 
         )
         .run(guildId, trkKey, vote, now);
     }
-  } catch {}
+    sqlite.exec('COMMIT');
+  } catch {
+    try { sqlite.exec('ROLLBACK'); } catch {}
+  }
   return getTasteProfile(guildId);
 }
 
@@ -204,6 +209,8 @@ export function getTasteProfile(guildId = 'global'): TasteProfile {
   const dislikedArtists = new Set<string>();
   const dislikedTracks = new Set<string>();
   const cooldowns: CooldownEntry[] = [];
+  const expiredArtists: string[] = [];
+  const expiredTracks: string[] = [];
   const now = Math.floor(Date.now() / 1000);
   try {
     const rows = sqlite
@@ -213,23 +220,30 @@ export function getTasteProfile(guildId = 'global'): TasteProfile {
       const key = String(r.entity_key);
       const age = now - Number(r.updated_at || now);
       if (r.entity_type === 'artist') {
-        if (r.vote === 'up') {
-          likedArtists.add(key);
-        } else if (r.vote === 'down') {
+        if (r.vote === 'up') likedArtists.add(key);
+        else if (r.vote === 'down') {
           if (age < 7200) {
             dislikedArtists.add(key);
             cooldowns.push({ key, type: 'artist', remainingMins: Math.max(1, Math.ceil((7200 - age) / 60)) });
-          } else {
-            sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'artist' AND entity_key = ?").run(guildId, key);
-          }
+          } else expiredArtists.push(key);
         }
       } else if (r.entity_type === 'track' && r.vote === 'down') {
         if (age < 86400) {
           dislikedTracks.add(key);
           cooldowns.push({ key, type: 'track', remainingMins: Math.max(1, Math.ceil((86400 - age) / 60)) });
-        } else {
-          sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'track' AND entity_key = ?").run(guildId, key);
-        }
+        } else expiredTracks.push(key);
+      }
+    }
+    if (expiredArtists.length > 0 || expiredTracks.length > 0) {
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        const delArt = sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'artist' AND entity_key = ?");
+        for (const k of expiredArtists) delArt.run(guildId, k);
+        const delTrk = sqlite.prepare("DELETE FROM taste_feedback WHERE guild_id = ? AND entity_type = 'track' AND entity_key = ?");
+        for (const k of expiredTracks) delTrk.run(guildId, k);
+        sqlite.exec('COMMIT');
+      } catch {
+        try { sqlite.exec('ROLLBACK'); } catch {}
       }
     }
   } catch {}

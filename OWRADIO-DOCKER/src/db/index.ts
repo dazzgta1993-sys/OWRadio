@@ -15,6 +15,7 @@ if (!fs.existsSync(dbDir)) {
 
 export class SQLiteWrapper {
   private db: DatabaseSync;
+  private stmtCache = new Map<string, any>();
 
   constructor(filePath: string) {
     this.db = new DatabaseSync(filePath);
@@ -31,7 +32,11 @@ export class SQLiteWrapper {
   }
 
   prepare(sql: string) {
-    const stmt = this.db.prepare(sql);
+    let stmt = this.stmtCache.get(sql);
+    if (!stmt) {
+      stmt = this.db.prepare(sql);
+      this.stmtCache.set(sql, stmt);
+    }
     return {
       run: (...params: any[]) => stmt.run(...params),
       get: (...params: any[]) => stmt.get(...params) as Record<string, any> | undefined,
@@ -41,6 +46,7 @@ export class SQLiteWrapper {
 
   close(): void {
     try {
+      this.stmtCache.clear();
       this.db.close();
     } catch {}
   }
@@ -49,6 +55,7 @@ export class SQLiteWrapper {
 export const sqlite = new SQLiteWrapper(config.DATABASE_PATH);
 
 sqlite.pragma('journal_mode = WAL');
+sqlite.pragma('busy_timeout = 5000');
 sqlite.pragma('synchronous = NORMAL');
 sqlite.pragma('foreign_keys = ON');
 
@@ -92,6 +99,7 @@ function initSchema(): void {
     );
 
     CREATE INDEX IF NOT EXISTS idx_history_played_at ON playback_history(played_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_history_guild_played ON playback_history(guild_id, played_at DESC);
 
     CREATE TABLE IF NOT EXISTS taste_feedback (
       guild_id TEXT NOT NULL DEFAULT 'global',
@@ -110,5 +118,7 @@ function initSchema(): void {
 }
 
 initSchema();
+
+process.once('exit', () => sqlite.close());
 
 export default sqlite;
