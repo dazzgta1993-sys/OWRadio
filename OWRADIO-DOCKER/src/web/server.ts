@@ -44,7 +44,11 @@ app.get('/style.css', (c) => c.text(fs.readFileSync(path.join(publicDir, 'style.
 
 app.get('/stream.mp3', (c) => {
   c.header('Content-Type', 'audio/mpeg');
-  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
+  c.header('Accept-Ranges', 'none');
+  c.header('Access-Control-Allow-Origin', '*');
   c.header('Connection', 'keep-alive');
   c.header('icy-name', 'OWRadio Studio Stream');
 

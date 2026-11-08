@@ -15,6 +15,9 @@ export class BroadcastTee {
   private trackDecoder: ChildProcess | null = null;
   private silenceInterval: NodeJS.Timeout | null = null;
   private mp3Clients = new Set<PassThrough>();
+  private mp3RingBuffer: Buffer[] = [];
+  private mp3RingBufferSize = 0;
+  private readonly MAX_BURST_BYTES = 65536;
   private activeDiscordStream: PassThrough | null = null;
   private currentVolume = 1.0;
   private currentRmsDb = -100;
@@ -54,6 +57,12 @@ export class BroadcastTee {
 
       this.mp3Encoder.stdin.on('error', () => {});
       this.mp3Encoder.stdout.on('data', (chunk: Buffer) => {
+        this.mp3RingBuffer.push(chunk);
+        this.mp3RingBufferSize += chunk.length;
+        while (this.mp3RingBufferSize > this.MAX_BURST_BYTES && this.mp3RingBuffer.length > 1) {
+          const dropped = this.mp3RingBuffer.shift();
+          if (dropped) this.mp3RingBufferSize -= dropped.length;
+        }
         for (const client of this.mp3Clients) {
           if (!client.destroyed) {
             client.write(chunk);
@@ -231,7 +240,10 @@ export class BroadcastTee {
   }
 
   public addMp3Client(): PassThrough {
-    const client = new PassThrough();
+    const client = new PassThrough({ highWaterMark: 131072 });
+    for (const chunk of this.mp3RingBuffer) {
+      if (!client.destroyed) client.write(chunk);
+    }
     this.mp3Clients.add(client);
     client.on('close', () => this.mp3Clients.delete(client));
     client.on('error', () => this.mp3Clients.delete(client));

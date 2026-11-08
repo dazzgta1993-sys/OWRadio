@@ -97,10 +97,15 @@ el.listenLiveBtn.addEventListener('click', () => {
   if (!isListeningInBrowser) {
     el.browserAudio.src = `/stream.mp3?t=${Date.now()}`;
     el.browserAudio.volume = savedVolume / 100;
-    el.browserAudio.play().catch(() => {});
     isListeningInBrowser = true;
-    el.listenLiveBtn.textContent = '🎧 Streaming Live (Click to Mute)';
+    el.listenLiveBtn.textContent = '⏳ Connecting Live Stream...';
     el.listenLiveBtn.classList.add('active');
+    el.browserAudio.play().catch((err) => {
+      console.warn('Playback error / autoplay blocked:', err);
+      el.listenLiveBtn.textContent = '▶ Click to Listen Live (192kbps)';
+      el.listenLiveBtn.classList.remove('active');
+      isListeningInBrowser = false;
+    });
   } else {
     el.browserAudio.pause();
     el.browserAudio.src = '';
@@ -114,6 +119,18 @@ el.browserAudio.addEventListener('waiting', () => {
 });
 el.browserAudio.addEventListener('playing', () => {
   if (isListeningInBrowser) el.listenLiveBtn.textContent = '🎧 Streaming Live (Click to Mute)';
+});
+el.browserAudio.addEventListener('canplay', () => {
+  if (isListeningInBrowser && el.browserAudio.paused) {
+    el.browserAudio.play().catch(() => {});
+  }
+});
+el.browserAudio.addEventListener('error', () => {
+  if (isListeningInBrowser) {
+    el.listenLiveBtn.textContent = '⚠️ Stream Disconnected (Click to Retry)';
+    el.listenLiveBtn.classList.remove('active');
+    isListeningInBrowser = false;
+  }
 });
 
 // --- Search & Direct Play / Queue ---
@@ -195,23 +212,19 @@ document.addEventListener('click', (e) => {
 
 // --- Transport Controls ---
 const sendAction = async (act) => {
-  if (isListeningInBrowser && el.browserAudio) {
-    if (act === 'stop') {
+  if (act === 'stop') {
+    if (isListeningInBrowser && el.browserAudio) {
       el.browserAudio.pause();
       el.browserAudio.src = '';
-    } else if (act === 'toggle') {
-      if (!el.browserAudio.paused) el.browserAudio.pause();
-      else el.browserAudio.play().catch(() => {});
+      isListeningInBrowser = false;
+      el.listenLiveBtn.textContent = '🎧 Listen Live in Browser (192kbps)';
+      el.listenLiveBtn.classList.remove('active');
     }
   }
   try {
     const res = await fetch(`/api/player/${act}`, { method: 'POST' });
     const data = await res.json();
     if (data.state && window.renderState) window.renderState(data.state);
-    if (isListeningInBrowser && el.browserAudio && (act === 'skip' || act === 'dislike')) {
-      el.browserAudio.src = `/stream.mp3?t=${Date.now()}`;
-      el.browserAudio.play().catch(() => {});
-    }
   } catch {}
 };
 el.playPauseBtn.addEventListener('click', () => sendAction('toggle'));
