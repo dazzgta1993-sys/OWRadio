@@ -60,6 +60,7 @@ export class GuildPlayer extends EventEmitter {
   private isPrewarming = false;
   private consecutiveFailures = 0;
   private failedKeys = new Set<string>();
+  private cachedStaticSnapshot: Record<string, any> | null = null;
 
   constructor(guildId = 'global') {
     super();
@@ -71,6 +72,7 @@ export class GuildPlayer extends EventEmitter {
     this.audioPlayer.on(AudioPlayerStatus.Idle, () => { if (!this.suppressIdleEvent) void this.playNext(); });
     this.audioPlayer.on(AudioPlayerStatus.AutoPaused, () => console.warn('⚠️ [Discord Voice] AutoPaused: buffer underrun'));
     this.audioPlayer.on('error', (err) => { console.warn('⚠️ [Discord Voice] Error:', err.message); if (!this.suppressIdleEvent) void this.playNext(); });
+    this.on('trackStart', (track) => savePlaybackHistory(track, this.guildId));
   }
 
   public attachVoiceConnection(conn: VoiceConnection): void {
@@ -82,9 +84,7 @@ export class GuildPlayer extends EventEmitter {
     if (!this.currentTrack || this.playStartTime <= 0) return 0;
     const now = this.isPaused && this.pauseStartTime > 0 ? this.pauseStartTime : Date.now();
     const secs = Math.floor(Math.max(0, now - this.playStartTime - this.totalPausedMs) / 1000);
-    if (this.currentTrack.duration > 0 && secs > this.currentTrack.duration) {
-      this.currentTrack.duration = secs;
-    }
+    if (this.currentTrack.duration > 0 && secs > this.currentTrack.duration) this.currentTrack.duration = secs;
     return secs;
   }
 
@@ -95,21 +95,13 @@ export class GuildPlayer extends EventEmitter {
   }
 
   public async playNow(track: AudioTrack): Promise<void> {
-    if (!track.isAutoplay) {
-      this.purgeAutoplayTracks();
-      this.vibeAnchorArtist = extractPrimaryArtist(track.artist);
-      this.consecutiveAutoplayCount = 0;
-    }
+    if (!track.isAutoplay) { this.purgeAutoplayTracks(); this.vibeAnchorArtist = extractPrimaryArtist(track.artist); this.consecutiveAutoplayCount = 0; }
     this.queue.unshift(track);
     await this.playNext(true);
   }
 
   public enqueue(track: AudioTrack, atFront = false): number {
-    if (!track.isAutoplay) {
-      this.vibeAnchorArtist = extractPrimaryArtist(track.artist);
-      this.consecutiveAutoplayCount = 0;
-      this.deck2Track = null; this.deck3Track = null;
-    }
+    if (!track.isAutoplay) { this.vibeAnchorArtist = extractPrimaryArtist(track.artist); this.consecutiveAutoplayCount = 0; this.deck2Track = null; this.deck3Track = null; }
     if (atFront) this.queue.unshift(track); else this.queue.push(track);
     this.emitStateUpdate();
     if (this.isPlaying) void this.prewarmDecks(); else void this.playNext();
@@ -175,10 +167,7 @@ export class GuildPlayer extends EventEmitter {
       const ready = await ensureTrackStreamReady(nextTrack, () => this.emitStateUpdate());
       if (!ready || !nextTrack.streamUrl) {
         this.failedKeys.add(normalizeTrackKey(nextTrack.artist, nextTrack.title));
-        if (this.failedKeys.size > 100) {
-          const first = this.failedKeys.values().next().value;
-          if (first) this.failedKeys.delete(first);
-        }
+        if (this.failedKeys.size > 100) { const f = this.failedKeys.values().next().value; if (f) this.failedKeys.delete(f); }
         this.consecutiveFailures++;
         this.isTransitioning = false;
         if (this.consecutiveFailures >= 5) {
@@ -203,7 +192,6 @@ export class GuildPlayer extends EventEmitter {
 
       this.history.push(nextTrack);
       if (this.history.length > 100) this.history.shift();
-      savePlaybackHistory(nextTrack, this.guildId);
       console.log(`▶️ [Deck 1] ${nextTrack.artist} — ${nextTrack.title} [${nextTrack.formattedDuration}] (${nextTrack.source.toUpperCase()}${nextTrack.vibeReason ? ' • ' + nextTrack.vibeReason : ''})`);
       this.emitStateUpdate();
       this.emit('trackStart', nextTrack);
@@ -275,31 +263,44 @@ export class GuildPlayer extends EventEmitter {
     };
   }
 
-  public getStateSnapshot() {
-    const effectiveQueue = [...this.queue];
-    if (effectiveQueue.length === 0 && this.deck2Track) {
-      effectiveQueue.push(this.deck2Track);
-      if (this.deck3Track) effectiveQueue.push(this.deck3Track);
+  public getStateSnapshot(): {
+    state: string; isPlaying: boolean; isPaused: boolean; autoplay: boolean; loopMode: 'off' | 'track' | 'queue';
+    volume: number; rmsDb: number; listeners: number; vibeMode: VibeMode; vibeEngineSource: VibeEngineSource;
+    vibeAnchorArtist: string; lastVibeDecision: string; elapsed: number; nowPlaying: any; deck2: any; deck3: any;
+    queue: any[]; history: any[]; taste: any;
+  } {
+    if (!this.cachedStaticSnapshot) {
+      const effectiveQueue = [...this.queue];
+      if (effectiveQueue.length === 0 && this.deck2Track) {
+        effectiveQueue.push(this.deck2Track);
+        if (this.deck3Track) effectiveQueue.push(this.deck3Track);
+      }
+      const tp = getTasteProfile(this.guildId);
+      this.cachedStaticSnapshot = {
+        autoplay: this.autoplay, loopMode: this.loopMode,
+        vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
+        vibeAnchorArtist: this.vibeAnchorArtist, lastVibeDecision: this.lastVibeDecision,
+        nowPlaying: this.currentTrack ? this.currentTrack.toJSON() : null,
+        deck2: this.deck2Track ? this.deck2Track.toJSON() : null,
+        deck3: this.deck3Track ? this.deck3Track.toJSON() : null,
+        queue: effectiveQueue.map((t) => t.toJSON()),
+        history: this.history.slice(-25).reverse().map((t) => t.toJSON()),
+        taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns },
+      };
     }
-    const tp = getTasteProfile(this.guildId);
     return {
       state: this.isPlaying ? (this.isPaused ? 'paused' : 'playing') : 'idle',
-      isPlaying: this.isPlaying, isPaused: this.isPaused, autoplay: this.autoplay,
-      loopMode: this.loopMode, volume: this.broadcastTee.getVolumePercent(),
+      isPlaying: this.isPlaying, isPaused: this.isPaused, volume: this.broadcastTee.getVolumePercent(),
       rmsDb: this.broadcastTee.getRmsDb(), listeners: this.broadcastTee.getListenerCount(),
-      vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
-      vibeAnchorArtist: this.vibeAnchorArtist, lastVibeDecision: this.lastVibeDecision,
       elapsed: this.getElapsedSeconds(),
-      nowPlaying: this.currentTrack ? this.currentTrack.toJSON() : null,
-      deck2: this.deck2Track ? this.deck2Track.toJSON() : null,
-      deck3: this.deck3Track ? this.deck3Track.toJSON() : null,
-      queue: effectiveQueue.map((t) => t.toJSON()),
-      history: this.history.slice(-25).reverse().map((t) => t.toJSON()),
-      taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns },
-    };
+      ...this.cachedStaticSnapshot,
+    } as any;
   }
 
-  public emitStateUpdate(): void { this.emit('stateUpdate', this.getStateSnapshot()); }
+  public emitStateUpdate(): void {
+    this.cachedStaticSnapshot = null;
+    this.emit('stateUpdate', this.getStateSnapshot());
+  }
 }
 
 export const globalPlayer = new GuildPlayer('global');
