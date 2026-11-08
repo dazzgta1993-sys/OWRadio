@@ -9,6 +9,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import fs from 'node:fs';
+import path from 'node:path';
 import config from '../config.js';
 import { getStreamResolution, setStreamResolution, StreamResolutionRecord } from '../db/store.js';
 import { cleanTargetTitle, isDurationValid, isUnwantedVariant, isTitleMatch, isArtistMatch } from './streamFilters.js';
@@ -18,10 +19,16 @@ import { searchDeezerTracks, getDeezerTrackIsrc } from './deezer.js';
 const execFileAsync = promisify(execFile);
 const streamUrlCache = new Map<string, { url: string; headers: Record<string, string>; expiresAt: number; duration?: number }>();
 
+function getValidCookiesPath(): string | null {
+  const candidate = config.YOUTUBE_COOKIES_PATH ? path.resolve(config.YOUTUBE_COOKIES_PATH) : path.resolve(process.cwd(), 'cookies.txt');
+  try { if (fs.existsSync(candidate) && fs.statSync(candidate).size > 0) return candidate; } catch {}
+  return null;
+}
+
 function getYtDlpBaseArgs(): string[] {
   const args = ['--no-playlist', '--no-warnings', '--quiet', '--geo-bypass'];
-  if (config.YOUTUBE_COOKIES_PATH && fs.existsSync(config.YOUTUBE_COOKIES_PATH)) args.push('--cookies', config.YOUTUBE_COOKIES_PATH);
-  else if (fs.existsSync('./cookies.txt')) args.push('--cookies', './cookies.txt');
+  const cookies = getValidCookiesPath();
+  if (cookies) args.push('--cookies', cookies);
   if (config.YOUTUBE_PROXY) args.push('--proxy', config.YOUTUBE_PROXY);
   return args;
 }

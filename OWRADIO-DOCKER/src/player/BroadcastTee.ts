@@ -56,6 +56,7 @@ export class BroadcastTee {
       );
 
       this.mp3Encoder.stdin.on('error', () => {});
+      this.mp3Encoder.on('error', (err) => console.error('❌ [BroadcastTee] MP3 encoder error:', err.message));
       this.mp3Encoder.stdout.on('data', (chunk: Buffer) => {
         this.mp3RingBuffer.push(chunk);
         this.mp3RingBufferSize += chunk.length;
@@ -155,6 +156,7 @@ export class BroadcastTee {
 
     const decoder = spawn('ffmpeg', args, { stdio: ['ignore', 'pipe', 'pipe'] });
     this.trackDecoder = decoder;
+    decoder.on('error', (err) => console.error('❌ [BroadcastTee] Track decoder error:', err.message));
 
     decoder.stderr?.on('data', (d: Buffer) => {
       const msg = d.toString().trim();

@@ -8,9 +8,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import config from '../config.js';
 
-const dbDir = path.dirname(config.DATABASE_PATH);
-if (!fs.existsSync(dbDir)) {
+const dbDir = path.dirname(path.resolve(config.DATABASE_PATH));
+try {
   fs.mkdirSync(dbDir, { recursive: true });
+} catch (err) {
+  console.error(`❌ [Database] Failed to initialize directory "${dbDir}":`, (err as Error).message);
 }
 
 export class SQLiteWrapper {

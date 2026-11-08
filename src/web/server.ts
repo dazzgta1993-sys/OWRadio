@@ -37,19 +37,18 @@ function checkAdmin(c: any): boolean {
   return authService.verifySessionToken(token).valid;
 }
 
-app.get('/', (c) => c.html(fs.readFileSync(path.join(publicDir, 'index.html'), 'utf-8')));
-app.get('/app.js', (c) => c.text(fs.readFileSync(path.join(publicDir, 'app.js'), 'utf-8'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
-app.get('/catalog.js', (c) => c.text(fs.readFileSync(path.join(publicDir, 'catalog.js'), 'utf-8'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
-app.get('/style.css', (c) => c.text(fs.readFileSync(path.join(publicDir, 'style.css'), 'utf-8'), 200, { 'Content-Type': 'text/css; charset=utf-8' }));
+const staticCache = new Map<string, string>();
+const loadStatic = (f: string) => { if (!staticCache.has(f)) { try { staticCache.set(f, fs.readFileSync(path.join(publicDir, f), 'utf-8')); } catch { staticCache.set(f, ''); } } return staticCache.get(f) || ''; };
+app.get('/', (c) => c.html(loadStatic('index.html')));
+app.get('/app.js', (c) => c.text(loadStatic('app.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
+app.get('/catalog.js', (c) => c.text(loadStatic('catalog.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
+app.get('/style.css', (c) => c.text(loadStatic('style.css'), 200, { 'Content-Type': 'text/css; charset=utf-8' }));
 
 app.get('/stream.mp3', (c) => {
   c.header('Content-Type', 'audio/mpeg');
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-  c.header('Pragma', 'no-cache');
-  c.header('Expires', '0');
-  c.header('Accept-Ranges', 'none');
-  c.header('Access-Control-Allow-Origin', '*');
-  c.header('Connection', 'keep-alive');
+  c.header('Pragma', 'no-cache'); c.header('Expires', '0'); c.header('Accept-Ranges', 'none');
+  c.header('Access-Control-Allow-Origin', '*'); c.header('Connection', 'keep-alive');
   c.header('icy-name', 'OWRadio Studio Stream');
 
   return stream(c, async (s) => {
