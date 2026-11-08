@@ -94,6 +94,7 @@ export async function resolveTrackStream(params: {
     }
   };
 
+  // Pass 1: Direct Clean Studio Queries on YouTube Music WEB_REMIX
   const fastQueries = [`${cleanArtist} ${cleanCore}`.trim(), `${cleanArtist} - ${cleanCore}`.trim()];
   if (cleanAlbum) fastQueries.splice(1, 0, `${cleanArtist} ${cleanAlbum} ${cleanCore}`.trim());
   for (const q of fastQueries) {
@@ -102,6 +103,7 @@ export async function resolveTrackStream(params: {
     if (candidates.some((c) => c.score >= 50)) break;
   }
 
+  // Pass 2: Specific Quoted Official Audio Match
   if (candidates.length === 0) {
     const quoted = [`"${cleanArtist} - ${cleanCore} (Official Audio)"`, `"${cleanArtist}" "${cleanCore}"`];
     for (const q of quoted) {
@@ -111,6 +113,7 @@ export async function resolveTrackStream(params: {
     }
   }
 
+  // Pass 3: Exact ISRC Lookup
   if (candidates.length === 0) {
     if (!cleanIsrc && trackId && /^\d+$/.test(trackId)) cleanIsrc = await getDeezerTrackIsrc(trackId);
     if (cleanIsrc) {
@@ -119,11 +122,13 @@ export async function resolveTrackStream(params: {
     }
   }
 
+  // Pass 4: Stripped Core Title with +/-8s relaxed tolerance
   if (candidates.length === 0) {
     const items = await searchYtMusicSongs(`${cleanArtist} ${cleanCore}`.trim(), true, 15);
     evaluateItems(items, 8, cleanCore);
   }
 
+  // Pass 5: Unfiltered YouTube Music catalog (includes official videos)
   if (candidates.length === 0) {
     const items = await searchYtMusicSongs(`${cleanArtist} ${cleanCore} official audio`.trim(), false, 12);
     evaluateItems(items, 10, cleanCore);
@@ -141,6 +146,7 @@ export async function resolveTrackStream(params: {
     return resolved;
   }
 
+  // Pass 6: Direct yt-dlp search fallback
   const ytdlpHits = await searchYouTubeBasic(`${cleanArtist} - ${cleanCore} Official Audio`.trim(), 3);
   if (ytdlpHits.length > 0) {
     const top = ytdlpHits[0];

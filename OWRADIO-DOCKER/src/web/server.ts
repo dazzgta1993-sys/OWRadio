@@ -128,15 +128,47 @@ app.get('/api/charts', async (c) => {
   });
 });
 
-app.get('/api/artist/:artist/discography', async (c) => {
-  const art = c.req.param('artist');
-  return c.json(await searchArtistDiscography(art));
+app.get('/api/discography', async (c) => {
+  const artist = (c.req.query('artist') || '').trim();
+  if (!artist) return c.json({ albums: [] });
+  return c.json(await searchArtistDiscography(artist));
 });
 
-app.get('/api/album/:source/:id', async (c) => {
-  const src = c.req.param('source') as any;
-  const id = c.req.param('id');
-  return c.json({ tracks: await getAlbumTracklist(id, src) });
+app.get('/api/album-tracks', async (c) => {
+  const artist = (c.req.query('artist') || '').trim();
+  const album = (c.req.query('album') || '').trim();
+  const mbid = (c.req.query('mbid') || '').trim();
+  const dzId = (c.req.query('deezerAlbumId') || '').trim();
+  if (!artist && !album && !mbid && !dzId) return c.json({ tracks: [] });
+  const tracks = await getAlbumTracklist(artist, album, mbid, dzId);
+  return c.json({ artist, album, tracks });
+});
+
+app.post('/api/play-album', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const artist = String(body.artist || '').trim();
+  const album = String(body.album || '').trim();
+  const mode: 'now' | 'queue' = body.mode === 'queue' ? 'queue' : 'now';
+  if (!artist || !album) return c.json({ error: 'Missing artist or album' }, 400);
+
+  const raw = await getAlbumTracklist(artist, album, String(body.mbid || ''), String(body.deezerAlbumId || ''));
+  const tracks = raw.map(
+    (t: any) =>
+      new AudioTrack({
+        title: t.title, artist: t.artist || artist, album, duration: t.duration || 0,
+        artworkUrl: t.cover || '', deezerId: t.deezerId || t.id, isrc: t.isrc || '',
+        source: t.source || 'deezer', requestedBy: 'Album Explorer',
+      })
+  );
+  if (tracks.length === 0) return c.json({ error: 'No tracks found for album' }, 404);
+  if (mode === 'now') {
+    const [first, ...rest] = tracks;
+    await globalPlayer.playNow(first);
+    if (rest.length > 0) globalPlayer.enqueueMany(rest);
+  } else {
+    globalPlayer.enqueueMany(tracks);
+  }
+  return c.json({ ok: true, count: tracks.length, state: globalPlayer.getStateSnapshot() });
 });
 
 app.post('/api/play', async (c) => {
