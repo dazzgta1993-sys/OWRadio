@@ -222,7 +222,8 @@ export async function searchYouTubeBasic(query: string, limit = 5): Promise<Arra
       if (results.length >= limit) break;
     }
     return results;
-  } catch {
+  } catch (err) {
+    console.warn(`⚠️ [yt-dlp] Basic search failed for "${q}":`, (err as Error).message);
     return [];
   }
 }

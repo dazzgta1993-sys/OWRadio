@@ -168,7 +168,7 @@ discordClient.on('interactionCreate', async (interaction) => {
       if (snap.nowPlaying) lines.push(`🔊 **Deck 1 (Now Playing):** ${snap.nowPlaying.artist} — **${snap.nowPlaying.title}** (\`${snap.nowPlaying.durationFormatted}\`)`);
       if (snap.deck2) lines.push(`⚡ **Deck 2 (Ready):** ${snap.deck2.artist} — *${snap.deck2.title}*`);
       if (snap.deck3) lines.push(`🎯 **Deck 3 (Cued):** ${snap.deck3.artist} — *${snap.deck3.title}*`);
-      const extra = snap.queue.slice(0, 8).map((t, i) => `\`${i + 1}.\` ${t.artist} — ${t.title} (\`${t.durationFormatted}\`)`);
+      const extra = snap.queue.slice(0, 8).map((t: any, i: number) => `\`${i + 1}.\` ${t.artist} — ${t.title} (\`${t.durationFormatted}\`)`);
       if (extra.length > 0) lines.push('\n**Upcoming Queue:**', ...extra);
       await interaction.reply({ content: lines.join('\n') || 'Queue is currently empty.', ephemeral: true });
     } else if (cmd === 'charts') {

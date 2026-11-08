@@ -12,35 +12,45 @@ const MB_BASE = 'https://musicbrainz.org/ws/2';
 const CAA_BASE = 'https://coverartarchive.org/release-group';
 const MB_UA = 'OWRadioStudio/3.0 (https://github.com/owradio)';
 
+let mbQueue = Promise.resolve<any>(null);
 let lastMbRequestTime = 0;
 
 async function rateLimitedMbFetch(url: string): Promise<any | null> {
   const cached = getApiCache(url);
   if (cached) return cached;
 
-  const now = Date.now();
-  const elapsed = now - lastMbRequestTime;
-  if (elapsed < 1100) {
-    await new Promise((r) => setTimeout(r, 1100 - elapsed));
-  }
-  lastMbRequestTime = Date.now();
+  const runRequest = async (): Promise<any | null> => {
+    const recheck = getApiCache(url);
+    if (recheck) return recheck;
 
-  try {
-    const resp = await fetch(url, {
-      headers: {
-        'User-Agent': MB_UA,
-        Accept: 'application/json',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    if (data) {
-      setApiCache(url, data, 86400 * 14, 'musicbrainz');
-      return data;
+    const now = Date.now();
+    const elapsed = now - lastMbRequestTime;
+    if (elapsed < 1100) {
+      await new Promise((r) => setTimeout(r, 1100 - elapsed));
     }
-  } catch {}
-  return null;
+    lastMbRequestTime = Date.now();
+
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          'User-Agent': MB_UA,
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data) {
+        setApiCache(url, data, 86400 * 14, 'musicbrainz');
+        return data;
+      }
+    } catch {}
+    return null;
+  };
+
+  const nextPromise = mbQueue.then(runRequest, runRequest);
+  mbQueue = nextPromise;
+  return nextPromise;
 }
 
 /**

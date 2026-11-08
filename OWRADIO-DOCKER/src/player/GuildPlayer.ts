@@ -5,28 +5,13 @@
  */
 
 import { EventEmitter } from 'node:events';
-import {
-  AudioPlayer,
-  AudioPlayerStatus,
-  createAudioPlayer,
-  createAudioResource,
-  NoSubscriberBehavior,
-  StreamType,
-  VoiceConnection,
-} from '@discordjs/voice';
+import { AudioPlayer, AudioPlayerStatus, createAudioPlayer, createAudioResource, NoSubscriberBehavior, StreamType, VoiceConnection } from '@discordjs/voice';
 import AudioTrack from './AudioTrack.js';
 import BroadcastTee from './BroadcastTee.js';
 import { ensureTrackStreamReady, prewarmPlayerDecks } from './DeckPrewarmer.js';
 import { fetchNextVibeTrack, VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
 import { extractPrimaryArtist, normalizeTrackKey } from '../utils/artistNormalizer.js';
-import {
-  savePlaybackHistory,
-  recordTasteFeedback,
-  removeTasteFeedback,
-  getTasteProfile,
-  getRuntimeSetting,
-  setRuntimeSetting,
-} from '../db/store.js';
+import { savePlaybackHistory, recordTasteFeedback, removeTasteFeedback, getTasteProfile, getRuntimeSetting, setRuntimeSetting } from '../db/store.js';
 
 export class GuildPlayer extends EventEmitter {
   public guildId: string;
@@ -263,12 +248,7 @@ export class GuildPlayer extends EventEmitter {
     };
   }
 
-  public getStateSnapshot(): {
-    state: string; isPlaying: boolean; isPaused: boolean; autoplay: boolean; loopMode: 'off' | 'track' | 'queue';
-    volume: number; rmsDb: number; listeners: number; vibeMode: VibeMode; vibeEngineSource: VibeEngineSource;
-    vibeAnchorArtist: string; lastVibeDecision: string; elapsed: number; nowPlaying: any; deck2: any; deck3: any;
-    queue: any[]; history: any[]; taste: any;
-  } {
+  public getStateSnapshot(): Record<string, any> {
     if (!this.cachedStaticSnapshot) {
       const effectiveQueue = [...this.queue];
       if (effectiveQueue.length === 0 && this.deck2Track) {

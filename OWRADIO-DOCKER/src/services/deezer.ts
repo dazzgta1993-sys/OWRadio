@@ -34,18 +34,33 @@ export interface DeezerArtist {
   albumsCount: number;
 }
 
+let deezerCooldownUntil = 0;
+
 async function fetchDeezerJson(url: string, ttlSeconds = 1800): Promise<any | null> {
   const cached = getApiCache(url);
   if (cached) return cached;
+  if (Date.now() < deezerCooldownUntil) return null;
 
   try {
     const resp = await fetch(url, {
       headers: { 'User-Agent': 'OWRadio/3.0 (https://github.com/owradio)' },
       signal: AbortSignal.timeout(8000),
     });
+    if (resp.status === 429) {
+      deezerCooldownUntil = Date.now() + 10000;
+      console.warn('⚠️ [Deezer] HTTP 429 rate limit hit. Cooldown active for 10s.');
+      return null;
+    }
     if (!resp.ok) return null;
     const data: any = await resp.json();
-    if (data && !data.error) {
+    if (data?.error) {
+      if (data.error.code === 4 || /quota/i.test(data.error.message || '')) {
+        deezerCooldownUntil = Date.now() + 10000;
+        console.warn('⚠️ [Deezer] Quota limit hit. Cooldown active for 10s.');
+      }
+      return null;
+    }
+    if (data) {
       setApiCache(url, data, ttlSeconds, 'deezer');
       return data;
     }

@@ -22,6 +22,7 @@ export interface YtMusicCandidate {
 
 const YTM_SEARCH_URL = 'https://music.youtube.com/youtubei/v1/search?prettyPrint=false';
 const YTM_NEXT_URL = 'https://music.youtube.com/youtubei/v1/next?prettyPrint=false';
+let ytmCooldownUntil = 0;
 
 const YTM_CONTEXT = {
   context: {
@@ -149,6 +150,8 @@ export async function searchYtMusicSongs(
   const cached = getApiCache<YtMusicCandidate[]>(cacheKey);
   if (cached && cached.length > 0) return cached.slice(0, limit);
 
+  if (Date.now() < ytmCooldownUntil) return [];
+
   const payload: Record<string, any> = {
     ...YTM_CONTEXT,
     query: q,
@@ -164,6 +167,7 @@ export async function searchYtMusicSongs(
       body: JSON.stringify(payload),
       signal: AbortSignal.timeout(8000),
     });
+    if (resp.status === 429) { ytmCooldownUntil = Date.now() + 10000; return []; }
     if (!resp.ok) return [];
     const data: any = await resp.json();
 
@@ -210,6 +214,7 @@ export async function getYtMusicRelatedTracks(
   const cacheKey = `ytm_radio:${seedVid}`;
   const cached = getApiCache<YtMusicCandidate[]>(cacheKey);
   if (cached && cached.length > 0) return cached.slice(0, limit);
+  if (Date.now() < ytmCooldownUntil) return [];
 
   try {
     const payload = {

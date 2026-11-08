@@ -103,6 +103,7 @@ export class AuthService {
           Authorization: `Bearer ${accessToken}`,
           apikey: config.SUPABASE_ANON_KEY,
         },
+        signal: AbortSignal.timeout(5000),
       });
 
       if (!res.ok) {
