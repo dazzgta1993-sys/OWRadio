@@ -181,6 +181,11 @@ export async function extractStreamInfo(videoId: string): Promise<{ url: string;
       for (const [k, v] of Object.entries(info.http_headers)) headers[k] = String(v);
     }
     const duration = info?.duration ? Math.round(Number(info.duration)) : undefined;
+    if (streamUrlCache.size > 200) {
+      const now = Date.now();
+      for (const [k, v] of streamUrlCache.entries()) if (v.expiresAt <= now) streamUrlCache.delete(k);
+      if (streamUrlCache.size > 200) streamUrlCache.clear();
+    }
     streamUrlCache.set(cleanVid, { url: streamUrl, headers, duration, expiresAt: Date.now() + 3 * 3600 * 1000 });
     return { url: streamUrl, headers, duration };
   } catch (err) {

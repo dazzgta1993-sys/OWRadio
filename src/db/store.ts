@@ -53,6 +53,13 @@ export function getApiCache<T = any>(key: string): T | null {
 
 export function setApiCache(key: string, data: any, ttlSeconds = 1800, namespace = 'general'): void {
   const expiresAt = Math.floor(Date.now() / 1000) + ttlSeconds;
+  if (memApiCache.size > 400) {
+    const now = Math.floor(Date.now() / 1000);
+    for (const [k, v] of memApiCache.entries()) {
+      if (v.expiresAt <= now) memApiCache.delete(k);
+    }
+    if (memApiCache.size > 400) memApiCache.clear();
+  }
   memApiCache.set(key, { data, expiresAt });
   try {
     sqlite

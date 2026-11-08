@@ -68,7 +68,13 @@ app.get('/api/events', (c) => {
     let alive = true;
     const sendSnapshot = async () => {
       if (!alive) return;
-      try { await sse.writeSSE({ event: 'state', data: JSON.stringify(globalPlayer.getStateSnapshot()) }); } catch {}
+      try {
+        await sse.writeSSE({ event: 'state', data: JSON.stringify(globalPlayer.getStateSnapshot()) });
+      } catch {
+        alive = false;
+        clearInterval(timer);
+        globalPlayer.off('stateUpdate', onUpdate);
+      }
     };
     await sendSnapshot();
     const onUpdate = () => void sendSnapshot();

@@ -218,6 +218,12 @@ discordClient.on('interactionCreate', async (interaction) => {
     }
   } catch (err) {
     console.error('❌ [Discord] Interaction error:', err);
+    try {
+      if (interaction.isRepliable()) {
+        if (interaction.deferred) await interaction.editReply('⚠️ An error occurred while executing this command.');
+        else if (!interaction.replied) await interaction.reply({ content: '⚠️ An error occurred while executing this command.', ephemeral: true });
+      }
+    } catch {}
   }
 });
 

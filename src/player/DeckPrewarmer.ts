@@ -47,7 +47,7 @@ export async function ensureTrackStreamReady(
       if (streamInfo.duration && streamInfo.duration > 0) {
         track.duration = streamInfo.duration;
       }
-    } else if (track.videoId) {
+    } else if (track.videoId && (!track.duration || track.duration <= 0)) {
       const streamInfo = await extractStreamInfo(track.videoId);
       if (streamInfo?.duration && streamInfo.duration > 0) {
         track.duration = streamInfo.duration;

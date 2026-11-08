@@ -244,7 +244,6 @@ function renderState(s) {
   el.historyList.querySelectorAll('.hist-play').forEach((b) => b.addEventListener('click', () => window.triggerPlayOrQueue({ track: s.history[Number(b.dataset.idx)] }, 'now')));
 
   document.querySelectorAll('#vibeModeGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === s.vibeMode));
-  document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((b) => b.addEventListener('click', () => {}));
   document.querySelectorAll('#vibeEngineGroup .choice-btn').forEach((b) => b.classList.toggle('active', b.dataset.engine === s.vibeEngineSource));
 
   const likedEl = document.getElementById('likedList');

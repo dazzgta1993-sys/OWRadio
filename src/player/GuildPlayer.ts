@@ -58,6 +58,7 @@ export class GuildPlayer extends EventEmitter {
   private suppressIdleEvent = false;
   private isTransitioning = false;
   private isPrewarming = false;
+  private consecutiveFailures = 0;
   private failedKeys = new Set<string>();
 
   constructor(guildId = 'global') {
@@ -174,10 +175,21 @@ export class GuildPlayer extends EventEmitter {
       const ready = await ensureTrackStreamReady(nextTrack, () => this.emitStateUpdate());
       if (!ready || !nextTrack.streamUrl) {
         this.failedKeys.add(normalizeTrackKey(nextTrack.artist, nextTrack.title));
+        if (this.failedKeys.size > 100) {
+          const first = this.failedKeys.values().next().value;
+          if (first) this.failedKeys.delete(first);
+        }
+        this.consecutiveFailures++;
         this.isTransitioning = false;
+        if (this.consecutiveFailures >= 5) {
+          console.warn('⚠️ [Audio Pipeline] 5 consecutive stream resolution failures. Backing off 10s...');
+          setTimeout(() => { this.consecutiveFailures = 0; void this.playNext(); }, 10000);
+          return;
+        }
         void this.playNext();
         return;
       }
+      this.consecutiveFailures = 0;
 
       this.suppressIdleEvent = true;
       const pcmStream = this.broadcastTee.startTrackStream(nextTrack.streamUrl, nextTrack.streamHeaders || {});

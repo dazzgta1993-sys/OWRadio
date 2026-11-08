@@ -65,7 +65,12 @@ export class BroadcastTee {
         }
         for (const client of this.mp3Clients) {
           if (!client.destroyed) {
-            client.write(chunk);
+            if (client.writableLength > 524288) {
+              client.destroy();
+              this.mp3Clients.delete(client);
+            } else {
+              client.write(chunk);
+            }
           } else {
             this.mp3Clients.delete(client);
           }
