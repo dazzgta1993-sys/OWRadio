@@ -76,7 +76,7 @@ export class BroadcastTee {
     this.silenceInterval = setInterval(() => {
       if (!this.trackDecoder || this.isPaused) {
         this.currentRmsDb = -100;
-        if (this.mp3Encoder && !this.mp3Encoder.stdin.destroyed && this.mp3Clients.size > 0) {
+        if (this.mp3Encoder && !this.mp3Encoder.stdin.destroyed) {
           try {
             this.mp3Encoder.stdin.write(silentFrame);
           } catch {}
@@ -105,6 +105,7 @@ export class BroadcastTee {
       '-hide_banner',
       '-loglevel',
       'warning',
+      '-re',
       '-reconnect',
       '1',
       '-reconnect_streamed',
@@ -150,21 +151,15 @@ export class BroadcastTee {
 
     decoder.stdout?.on('data', (chunk: Buffer) => {
       const scaled = this.applyVolumeAndMeter(chunk);
-      if (this.mp3Encoder && !this.mp3Encoder.stdin.destroyed && this.mp3Clients.size > 0) {
+      if (this.mp3Encoder && !this.mp3Encoder.stdin.destroyed) {
         try {
           this.mp3Encoder.stdin.write(scaled);
         } catch {}
       }
-      if (!discordPass.destroyed) {
-        const canContinue = discordPass.write(scaled);
-        if (!canContinue) {
-          decoder.stdout?.pause();
-          discordPass.once('drain', () => {
-            if (this.trackDecoder === decoder && !this.isPaused) {
-              decoder.stdout?.resume();
-            }
-          });
-        }
+      if (!discordPass.destroyed && !discordPass.writableEnded) {
+        try {
+          discordPass.write(scaled);
+        } catch {}
       }
     });
 
