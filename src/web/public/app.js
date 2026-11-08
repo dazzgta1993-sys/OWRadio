@@ -202,19 +202,16 @@ const sendAction = async (act) => {
     } else if (act === 'toggle') {
       if (!el.browserAudio.paused) el.browserAudio.pause();
       else el.browserAudio.play().catch(() => {});
-    } else if (act === 'skip' || act === 'dislike') {
-      setTimeout(() => {
-        if (isListeningInBrowser && el.browserAudio) {
-          el.browserAudio.src = `/stream.mp3?t=${Date.now()}`;
-          el.browserAudio.play().catch(() => {});
-        }
-      }, 400);
     }
   }
   try {
     const res = await fetch(`/api/player/${act}`, { method: 'POST' });
     const data = await res.json();
     if (data.state && window.renderState) window.renderState(data.state);
+    if (isListeningInBrowser && el.browserAudio && (act === 'skip' || act === 'dislike')) {
+      el.browserAudio.src = `/stream.mp3?t=${Date.now()}`;
+      el.browserAudio.play().catch(() => {});
+    }
   } catch {}
 };
 el.playPauseBtn.addEventListener('click', () => sendAction('toggle'));

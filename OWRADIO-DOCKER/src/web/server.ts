@@ -210,7 +210,6 @@ app.post('/api/player/volume', async (c) => {
 });
 
 app.post('/api/player/:action', async (c) => {
-  if (!checkAdmin(c)) return c.json({ error: 'Admin authentication required' }, 401);
   const action = c.req.param('action');
   switch (action) {
     case 'pause': globalPlayer.pause(); break;
