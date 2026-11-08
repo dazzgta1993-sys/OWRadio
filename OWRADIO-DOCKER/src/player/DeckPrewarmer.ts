@@ -32,9 +32,7 @@ export async function ensureTrackStreamReady(
       });
       if (res?.id) {
         track.videoId = res.id;
-        if ((!track.duration || track.duration <= 0) && res.duration > 0) {
-          track.duration = res.duration;
-        }
+        if (res.duration > 0) track.duration = res.duration;
         if (!track.album && res.album) track.album = res.album;
       }
     }
@@ -46,7 +44,12 @@ export async function ensureTrackStreamReady(
       track.streamUrl = streamInfo.url;
       track.streamHeaders = streamInfo.headers;
       track.streamExpiresAt = Date.now() + 2.5 * 3600 * 1000;
-      if ((!track.duration || track.duration <= 0) && streamInfo.duration) {
+      if (streamInfo.duration && streamInfo.duration > 0) {
+        track.duration = streamInfo.duration;
+      }
+    } else if (track.videoId) {
+      const streamInfo = await extractStreamInfo(track.videoId);
+      if (streamInfo?.duration && streamInfo.duration > 0) {
         track.duration = streamInfo.duration;
       }
     }

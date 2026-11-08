@@ -81,7 +81,10 @@ export class GuildPlayer extends EventEmitter {
     if (!this.currentTrack || this.playStartTime <= 0) return 0;
     const now = this.isPaused && this.pauseStartTime > 0 ? this.pauseStartTime : Date.now();
     const secs = Math.floor(Math.max(0, now - this.playStartTime - this.totalPausedMs) / 1000);
-    return this.currentTrack.duration > 0 ? Math.min(secs, this.currentTrack.duration) : secs;
+    if (this.currentTrack.duration > 0 && secs > this.currentTrack.duration) {
+      this.currentTrack.duration = secs;
+    }
+    return secs;
   }
 
   public purgeAutoplayTracks(): void {

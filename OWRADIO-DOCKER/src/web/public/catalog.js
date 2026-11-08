@@ -276,7 +276,11 @@ fetch('/api/nowplaying').then((r) => r.json()).then(renderState).catch(() => {})
 setInterval(() => {
   const s = window.currentShow;
   if (s && s.isPlaying && !s.isPaused && s.nowPlaying) {
-    s.elapsed = Math.min(s.nowPlaying.duration || 999, (s.elapsed || 0) + 1);
+    s.elapsed = (s.elapsed || 0) + 1;
+    if (s.nowPlaying.duration > 0 && s.elapsed > s.nowPlaying.duration) {
+      s.nowPlaying.duration = s.elapsed;
+      window.el.totalDuration.textContent = window.formatSecs(s.nowPlaying.duration);
+    }
     window.el.elapsedTime.textContent = window.formatSecs(s.elapsed);
     if (s.nowPlaying.duration > 0) window.el.progressFill.style.width = `${Math.min(100, (s.elapsed / s.nowPlaying.duration) * 100)}%`;
   }
