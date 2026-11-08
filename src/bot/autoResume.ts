@@ -17,7 +17,7 @@ export async function runAutoResume(client: Client): Promise<void> {
 
   // 1. Restore recent playback history & lock Vibe Anchor to the last MANUAL track
   try {
-    const rows = getRecentHistory(25, 'global');
+    const rows = getRecentHistory(50, 'global');
     if (rows.length > 0 && globalPlayer.history.length === 0) {
       let lastManualTrack: AudioTrack | null = null;
       for (const r of [...rows].reverse()) {

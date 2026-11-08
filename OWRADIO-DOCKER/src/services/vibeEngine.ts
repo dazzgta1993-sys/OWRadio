@@ -70,11 +70,12 @@ export async function fetchNextVibeTrack(ctx: VibeStateContext, seedOverride?: A
   const { likedArtists, dislikedArtists, dislikedTracks } = getTasteProfile(ctx.guildId);
 
   const seenKeys = new Set<string>(); const seenTitles = new Set<string>();
-  const allActive = [...ctx.history.slice(-40), ...(ctx.currentTrack ? [ctx.currentTrack] : []), ...ctx.queue, ...(ctx.deck2Track ? [ctx.deck2Track] : []), ...(ctx.deck3Track ? [ctx.deck3Track] : []), ...(seedOverride ? [seedOverride] : [])];
+  const allActive = [...ctx.history.slice(-60), ...(ctx.currentTrack ? [ctx.currentTrack] : []), ...ctx.queue, ...(ctx.deck2Track ? [ctx.deck2Track] : []), ...(ctx.deck3Track ? [ctx.deck3Track] : []), ...(seedOverride ? [seedOverride] : [])];
   for (const t of allActive) { seenKeys.add(normalizeTrackKey(t.artist, t.title)); seenTitles.add(t.title.toLowerCase().trim()); }
 
   const recentArtists = new Set<string>();
-  const recentWindow = [...ctx.history.slice(-6), ...(ctx.currentTrack ? [ctx.currentTrack] : []), ...(ctx.deck2Track ? [ctx.deck2Track] : []), ...(ctx.deck3Track ? [ctx.deck3Track] : [])];
+  // 2.6-hour automatic artist separation cooldown (~45 tracks)
+  const recentWindow = [...ctx.history.slice(-45), ...(ctx.currentTrack ? [ctx.currentTrack] : []), ...(ctx.deck2Track ? [ctx.deck2Track] : []), ...(ctx.deck3Track ? [ctx.deck3Track] : [])];
   if (ctx.vibeMode !== 'deep_dive') {
     for (const t of recentWindow) {
       recentArtists.add(t.artist.toLowerCase().trim());
