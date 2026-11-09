@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OWRadio Studio — 100% Real Multi-Cloud Audio Engine</title>
-  <link rel="stylesheet" href="/style.css?v=3.2" />
+  <link rel="stylesheet" href="/style.css?v=3.3" />
 </head>
 <body>
   <header class="topbar">
@@ -223,25 +223,48 @@
           </div>
         </div>
 
+        <!-- Row 2: Cooldown Separation Hub (Split into Dedicated Artists & Tracks Cards) -->
+        <div class="vibe-settings-grid" style="margin-top: 14px;">
+          <!-- Card: Cooled Artists -->
+          <div class="setting-box">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <h3>❄️ Cooled Artists (2.6h Window)</h3>
+              <button id="clearAllArtistsBtn" class="btn btn-small" style="font-size:10px;padding:3px 8px;" title="Unlock all artists from 2.6h separation window">🗑️ Unlock All Artists</button>
+            </div>
+            <p class="setting-desc">Separates artists across 45 tracks (~2.6 hours) to prevent repeat fatigue. Click ✕ to unblock immediately.</p>
+            <div id="autoCoolArtistsList" style="display:flex;flex-wrap:wrap;gap:6px;max-height:190px;overflow-y:auto;margin-top:8px;"></div>
+          </div>
+
+          <!-- Card: Cooled Tracks -->
+          <div class="setting-box">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+              <h3>🕒 Cooled Tracks (3.5h Anti-Repeat)</h3>
+              <button id="clearAllTracksBtn" class="btn btn-small" style="font-size:10px;padding:3px 8px;" title="Unlock all songs from 3.5h repeat lockout">🗑️ Unlock All Tracks</button>
+            </div>
+            <p class="setting-desc">Past 60 tracks (~3.5 hours) locked out from repeating. Click ✕ to allow a track to be re-queued.</p>
+            <div id="autoCoolTracksList" style="display:flex;flex-direction:column;gap:5px;max-height:190px;overflow-y:auto;margin-top:8px;"></div>
+          </div>
+        </div>
+
+        <!-- Row 3: Loved Vibes & Manual Dislikes -->
         <div class="vibe-settings-grid" style="margin-top: 14px;">
           <div class="setting-box">
             <h3>👍 Loved Vibes</h3>
-            <p class="setting-desc">Artists you locked in with 👍 Lock Vibe.</p>
-            <div id="likedList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+            <p class="setting-desc">Artists you locked in with 👍 Lock Vibe (click ✕ to clear).</p>
+            <div id="likedList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
           </div>
+
           <div class="setting-box">
-            <h3>❄️ Smart Cooldowns (2.6h Separation)</h3>
-            <p class="setting-desc">Artists locked out for 2.6h (45 songs), tracks for 3.5h (60 songs) to keep station 100% fresh (click ✕ to clear).</p>
-            <div id="dislikedList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
-            <div style="margin-top:10px;font-size:11px;color:var(--text-muted);font-weight:600;">ACTIVE 2.6H LOCKED ARTISTS (AUTO-SEPARATION):</div>
-            <div id="autoCoolList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+            <h3>👎 Manual Blocks &amp; Skips</h3>
+            <p class="setting-desc">Explicit blocks from 👎 Skip &amp; Cool button (click ✕ to restore).</p>
+            <div id="dislikedList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
           </div>
         </div>
       </div>
     </section>
   </main>
 
-  <script src="/app.js?v=3.2"></script>
-  <script src="/catalog.js?v=3.2"></script>
+  <script src="/app.js?v=3.3"></script>
+  <script src="/catalog.js?v=3.3"></script>
 </body>
 </html>

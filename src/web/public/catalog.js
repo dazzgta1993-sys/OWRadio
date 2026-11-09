@@ -239,6 +239,8 @@ function renderState(s) {
 
   const likedEl = document.getElementById('likedList');
   const dislikedEl = document.getElementById('dislikedList');
+  const coolArtEl = document.getElementById('autoCoolArtistsList');
+  const coolTrkEl = document.getElementById('autoCoolTracksList');
   const tSig = s.taste ? JSON.stringify(s.taste) : '';
   if (tSig !== lastTasteSig) {
     lastTasteSig = tSig;
@@ -250,16 +252,31 @@ function renderState(s) {
       const cds = s.taste.cooldowns || [];
       const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
       dislikedEl.innerHTML = cds.length ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No manual blocks (use 👎 Skip & Cool).</span>';
-      const autoCoolEl = document.getElementById('autoCoolList');
-      if (autoCoolEl) {
-        const auto = s.taste.autoCool || [];
-        autoCoolEl.innerHTML = auto.length ? auto.map((a) => `<span class="pill pill-anchor" style="font-size:11px;opacity:0.85;">🔒 ${window.escapeHtml(a)}</span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">History building up...</span>';
-      }
+    }
+    if (coolArtEl && s.taste) {
+      const arts = s.taste.autoCoolArtists || [];
+      coolArtEl.innerHTML = arts.length ? arts.map((a) => `<span class="pill pill-anchor" style="font-size:11px;display:inline-flex;align-items:center;gap:6px;">🔒 ${window.escapeHtml(a)} <button class="cool-artist-rm" data-artist="${window.escapeHtml(a)}" title="Unlock artist" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No cooled artists.</span>';
+    }
+    if (coolTrkEl && s.taste) {
+      const trks = s.taste.autoCoolTracks || [];
+      coolTrkEl.innerHTML = trks.length ? trks.map((t) => `<div class="track-row" style="padding:5px 9px;font-size:11px;"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;"><strong style="color:var(--text-main);">${window.escapeHtml(t.title)}</strong> <span style="color:var(--text-muted);">— ${window.escapeHtml(t.artist)}</span></div><button class="cool-track-rm btn btn-small" data-title="${window.escapeHtml(t.title)}" title="Unlock track" style="padding:2px 6px;font-size:10px;margin-left:6px;">✕</button></div>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No cooled tracks.</span>';
     }
     document.querySelectorAll('.taste-rm').forEach((b) => b.addEventListener('click', async () => { const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) }); const data = await res.json(); if (data.state) renderState(data.state); }));
+    document.querySelectorAll('.cool-artist-rm').forEach((b) => b.addEventListener('click', async () => { const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.artist }) }); const data = await res.json(); if (data.state) renderState(data.state); }));
+    document.querySelectorAll('.cool-track-rm').forEach((b) => b.addEventListener('click', async () => { const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ track: b.dataset.title }) }); const data = await res.json(); if (data.state) renderState(data.state); }));
   }
 }
 window.renderState = renderState;
+document.getElementById('clearAllArtistsBtn')?.addEventListener('click', async () => {
+  const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clearAllArtists: true }) });
+  const data = await res.json();
+  if (data.state) renderState(data.state);
+});
+document.getElementById('clearAllTracksBtn')?.addEventListener('click', async () => {
+  const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clearAllTracks: true }) });
+  const data = await res.json();
+  if (data.state) renderState(data.state);
+});
 if (window.pendingState) { renderState(window.pendingState); window.pendingState = null; }
 
 fetch('/api/nowplaying').then((r) => r.ok ? r.json() : null).then((d) => d && renderState(d)).catch(() => {});

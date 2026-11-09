@@ -11,7 +11,7 @@ import BroadcastTee from './BroadcastTee.js';
 import { ensureTrackStreamReady, prewarmPlayerDecks } from './DeckPrewarmer.js';
 import { fetchNextVibeTrack, VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
 import { announceNextTrackIfDue, isDjVoiceEnabled } from '../services/djVoice.js';
-import { extractPrimaryArtist, normalizeTrackKey } from '../utils/artistNormalizer.js';
+import { extractPrimaryArtist, normalizeTrackKey, normalizeNameForMatch } from '../utils/artistNormalizer.js';
 import { savePlaybackHistory, recordTasteFeedback, removeTasteFeedback, getTasteProfile, getRuntimeSetting, setRuntimeSetting } from '../db/store.js';
 
 export class GuildPlayer extends EventEmitter {
@@ -38,14 +38,9 @@ export class GuildPlayer extends EventEmitter {
   public consecutiveAutoplayCount = 0;
   public lastVibeDecision = 'Ready';
 
-  private playStartTime = 0;
-  private pauseStartTime = 0;
-  private totalPausedMs = 0;
-  private suppressIdleEvent = false;
-  private isTransitioning = false;
-  private isPrewarming = false;
-  private consecutiveFailures = 0;
-  private failedKeys = new Set<string>();
+  private playStartTime = 0; private pauseStartTime = 0; private totalPausedMs = 0;
+  private suppressIdleEvent = false; private isTransitioning = false; private isPrewarming = false;
+  private consecutiveFailures = 0; private failedKeys = new Set<string>();
   private cachedStaticSnapshot: Record<string, any> | null = null;
 
   constructor(guildId = 'global') {
@@ -62,8 +57,7 @@ export class GuildPlayer extends EventEmitter {
   }
 
   public attachVoiceConnection(conn: VoiceConnection): void {
-    this.voiceConnection = conn;
-    conn.subscribe(this.audioPlayer);
+    this.voiceConnection = conn; conn.subscribe(this.audioPlayer);
   }
 
   public getElapsedSeconds(): number {
@@ -76,14 +70,12 @@ export class GuildPlayer extends EventEmitter {
 
   public purgeAutoplayTracks(): void {
     this.queue = this.queue.filter((t) => !t.isAutoplay);
-    this.deck2Track = null;
-    this.deck3Track = null;
+    this.deck2Track = null; this.deck3Track = null;
   }
 
   public async playNow(track: AudioTrack): Promise<void> {
     if (!track.isAutoplay) { this.purgeAutoplayTracks(); this.vibeAnchorArtist = extractPrimaryArtist(track.artist); this.consecutiveAutoplayCount = 0; }
-    this.queue.unshift(track);
-    await this.playNext(true);
+    this.queue.unshift(track); await this.playNext(true);
   }
 
   public enqueue(track: AudioTrack, atFront = false): number {
@@ -96,11 +88,8 @@ export class GuildPlayer extends EventEmitter {
 
   public enqueueMany(tracks: AudioTrack[]): number {
     if (tracks.length === 0) return this.queue.length;
-    this.vibeAnchorArtist = extractPrimaryArtist(tracks[0].artist);
-    this.consecutiveAutoplayCount = 0;
-    this.deck2Track = null; this.deck3Track = null;
-    this.queue.push(...tracks);
-    this.emitStateUpdate();
+    this.vibeAnchorArtist = extractPrimaryArtist(tracks[0].artist); this.consecutiveAutoplayCount = 0;
+    this.deck2Track = null; this.deck3Track = null; this.queue.push(...tracks); this.emitStateUpdate();
     if (this.isPlaying) void this.prewarmDecks(); else void this.playNext();
     return this.queue.length;
   }
@@ -222,6 +211,25 @@ export class GuildPlayer extends EventEmitter {
     if (this.isPlaying) void this.prewarmDecks();
   }
 
+  public removeArtistFromCooldown(art: string): void {
+    const n = normalizeNameForMatch(art);
+    this.history = this.history.filter((t) => normalizeNameForMatch(t.artist) !== n);
+    this.deck2Track = null; this.deck3Track = null; this.emitStateUpdate();
+    if (this.isPlaying) void this.prewarmDecks();
+  }
+
+  public removeTrackFromCooldown(titleOrId: string): void {
+    const n = normalizeNameForMatch(titleOrId);
+    this.history = this.history.filter((t) => t.id !== titleOrId && normalizeNameForMatch(t.title) !== n);
+    this.deck2Track = null; this.deck3Track = null; this.emitStateUpdate();
+    if (this.isPlaying) void this.prewarmDecks();
+  }
+
+  public clearAllArtistCooldowns(): void {
+    this.history = []; this.deck2Track = null; this.deck3Track = null;
+    this.emitStateUpdate(); if (this.isPlaying) void this.prewarmDecks();
+  }
+
   public voteCurrentTrack(vote: 'up' | 'down'): void {
     if (!this.currentTrack) return;
     const art = extractPrimaryArtist(this.currentTrack.artist);
@@ -257,7 +265,8 @@ export class GuildPlayer extends EventEmitter {
         if (this.deck3Track) effectiveQueue.push(this.deck3Track);
       }
       const tp = getTasteProfile(this.guildId);
-      const autoCool = Array.from(new Set(this.history.slice(-45).map((t) => t.artist))).slice(0, 35);
+      const autoCoolArtists = Array.from(new Set(this.history.slice(-45).map((t) => t.artist))).slice(0, 35);
+      const autoCoolTracks = this.history.slice(-60).map((t) => ({ id: t.id, title: t.title, artist: t.artist })).reverse().slice(0, 35);
       this.cachedStaticSnapshot = {
         autoplay: this.autoplay, loopMode: this.loopMode, djVoice: isDjVoiceEnabled(),
         vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
@@ -267,7 +276,7 @@ export class GuildPlayer extends EventEmitter {
         deck3: this.deck3Track ? this.deck3Track.toJSON() : null,
         queue: effectiveQueue.map((t) => t.toJSON()),
         history: this.history.slice(-25).reverse().map((t) => t.toJSON()),
-        taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns, autoCool },
+        taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns, autoCoolArtists, autoCoolTracks },
       };
     }
     return {

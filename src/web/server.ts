@@ -278,8 +278,10 @@ app.post('/api/vibe', async (c) => {
 });
 
 app.post('/api/taste/remove', async (c) => {
-  const body = await c.req.json().catch(() => ({}));
-  if (body.key) removeTasteFeedback(String(body.key));
+  const b = await c.req.json().catch(() => ({}));
+  if (b.key) { removeTasteFeedback(String(b.key)); globalPlayer.removeArtistFromCooldown(String(b.key)); }
+  if (b.track) globalPlayer.removeTrackFromCooldown(String(b.track));
+  if (b.clearAllAuto || b.clearAllArtists || b.clearAllTracks) globalPlayer.clearAllArtistCooldowns();
   globalPlayer.emitStateUpdate();
   return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
 });
