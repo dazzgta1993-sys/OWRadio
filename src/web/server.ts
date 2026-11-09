@@ -263,6 +263,12 @@ app.post('/api/dj/toggle', async (c) => {
   return c.json({ ok: true, djVoice: next, state: globalPlayer.getStateSnapshot() });
 });
 
+app.post('/api/dj/announce', async (c) => {
+  const { announceNextTrackIfDue } = await import('../services/djVoice.js');
+  void announceNextTrackIfDue(globalPlayer, true);
+  return c.json({ ok: true });
+});
+
 app.post('/api/vibe', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   if (typeof body.autoplay === 'boolean') globalPlayer.autoplay = body.autoplay;
