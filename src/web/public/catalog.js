@@ -249,7 +249,12 @@ function renderState(s) {
     if (dislikedEl && s.taste) {
       const cds = s.taste.cooldowns || [];
       const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
-      dislikedEl.innerHTML = cds.length ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No active cooldowns.</span>';
+      dislikedEl.innerHTML = cds.length ? cds.map((c) => `<span class="pill pill-anchor" style="display:inline-flex;align-items:center;gap:6px;">❄️ ${window.escapeHtml(c.key)} <small style="opacity:0.8">(${fmtMins(c.remainingMins)})</small> <button class="taste-rm" data-key="${window.escapeHtml(c.key)}" style="background:none;border:none;color:inherit;cursor:pointer;font-weight:700;">✕</button></span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">No manual blocks (use 👎 Skip & Cool).</span>';
+      const autoCoolEl = document.getElementById('autoCoolList');
+      if (autoCoolEl) {
+        const auto = s.taste.autoCool || [];
+        autoCoolEl.innerHTML = auto.length ? auto.map((a) => `<span class="pill pill-anchor" style="font-size:11px;opacity:0.85;">🔒 ${window.escapeHtml(a)}</span>`).join('') : '<span style="font-size:12px;color:#9ca3af;">History building up...</span>';
+      }
     }
     document.querySelectorAll('.taste-rm').forEach((b) => b.addEventListener('click', async () => { const res = await fetch('/api/taste/remove', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: b.dataset.key }) }); const data = await res.json(); if (data.state) renderState(data.state); }));
   }

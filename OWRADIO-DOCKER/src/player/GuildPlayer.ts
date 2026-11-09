@@ -257,6 +257,7 @@ export class GuildPlayer extends EventEmitter {
         if (this.deck3Track) effectiveQueue.push(this.deck3Track);
       }
       const tp = getTasteProfile(this.guildId);
+      const autoCool = Array.from(new Set(this.history.slice(-45).map((t) => t.artist))).slice(0, 35);
       this.cachedStaticSnapshot = {
         autoplay: this.autoplay, loopMode: this.loopMode, djVoice: isDjVoiceEnabled(),
         vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
@@ -266,7 +267,7 @@ export class GuildPlayer extends EventEmitter {
         deck3: this.deck3Track ? this.deck3Track.toJSON() : null,
         queue: effectiveQueue.map((t) => t.toJSON()),
         history: this.history.slice(-25).reverse().map((t) => t.toJSON()),
-        taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns },
+        taste: { likedArtists: [...tp.likedArtists], dislikedArtists: [...tp.dislikedArtists], dislikedTracks: [...tp.dislikedTracks], cooldowns: tp.cooldowns, autoCool },
       };
     }
     return {
