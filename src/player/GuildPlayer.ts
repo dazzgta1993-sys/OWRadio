@@ -10,6 +10,7 @@ import AudioTrack from './AudioTrack.js';
 import BroadcastTee from './BroadcastTee.js';
 import { ensureTrackStreamReady, prewarmPlayerDecks } from './DeckPrewarmer.js';
 import { fetchNextVibeTrack, VibeMode, VibeEngineSource } from '../services/vibeEngine.js';
+import { announceNextTrackIfDue, isDjVoiceEnabled } from '../services/djVoice.js';
 import { extractPrimaryArtist, normalizeTrackKey } from '../utils/artistNormalizer.js';
 import { savePlaybackHistory, recordTasteFeedback, removeTasteFeedback, getTasteProfile, getRuntimeSetting, setRuntimeSetting } from '../db/store.js';
 
@@ -180,7 +181,7 @@ export class GuildPlayer extends EventEmitter {
       console.log(`▶️ [Deck 1] ${nextTrack.artist} — ${nextTrack.title} [${nextTrack.formattedDuration}] (${nextTrack.source.toUpperCase()}${nextTrack.vibeReason ? ' • ' + nextTrack.vibeReason : ''})`);
       this.emitStateUpdate();
       this.emit('trackStart', nextTrack);
-      void this.prewarmDecks();
+      void this.prewarmDecks().then(() => { setTimeout(() => void announceNextTrackIfDue(this), 3500); });
     } finally {
       this.isTransitioning = false;
     }
@@ -257,7 +258,7 @@ export class GuildPlayer extends EventEmitter {
       }
       const tp = getTasteProfile(this.guildId);
       this.cachedStaticSnapshot = {
-        autoplay: this.autoplay, loopMode: this.loopMode,
+        autoplay: this.autoplay, loopMode: this.loopMode, djVoice: isDjVoiceEnabled(),
         vibeMode: this.vibeMode, vibeEngineSource: this.vibeEngineSource,
         vibeAnchorArtist: this.vibeAnchorArtist, lastVibeDecision: this.lastVibeDecision,
         nowPlaying: this.currentTrack ? this.currentTrack.toJSON() : null,

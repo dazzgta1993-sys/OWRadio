@@ -12,6 +12,7 @@ window.el = {
   queueQueryBtn: document.getElementById('queueQueryBtn'),
   searchDropdown: document.getElementById('searchResultsDropdown'),
   autoplayBtn: document.getElementById('autoplayBtn'),
+  djVoiceBtn: document.getElementById('djVoiceBtn'),
   anchorPill: document.getElementById('anchorPill'),
   sourceBadge: document.getElementById('sourceBadge'),
   nowPlayingArt: document.getElementById('nowPlayingArt'),
@@ -255,6 +256,13 @@ if (el.autoplayBtn) {
   el.autoplayBtn.addEventListener('click', async () => {
     const nextVal = !(window.currentShow && window.currentShow.autoplay !== false);
     const res = await fetch('/api/vibe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ autoplay: nextVal }) });
+    const data = await res.json();
+    if (data.state && window.renderState) window.renderState(data.state);
+  });
+}
+if (el.djVoiceBtn) {
+  el.djVoiceBtn.addEventListener('click', async () => {
+    const res = await fetch('/api/dj/toggle', { method: 'POST' });
     const data = await res.json();
     if (data.state && window.renderState) window.renderState(data.state);
   });

@@ -22,6 +22,9 @@ export class BroadcastTee {
   private currentVolume = 1.0;
   private currentRmsDb = -100;
   private isPaused = false;
+  private activeVoicePcm: Buffer | null = null;
+  private voiceOffset = 0;
+  private duckGain = 1.0;
 
   constructor() {
     this.startContinuousMp3Encoder();
@@ -196,15 +199,28 @@ export class BroadcastTee {
     const sampleCount = Math.floor(buf.length / 2);
     if (sampleCount === 0) return buf;
 
-    const out = vol === 1.0 ? buf : Buffer.allocUnsafe(buf.length);
+    const hasVoice = Boolean(this.activeVoicePcm && this.voiceOffset < this.activeVoicePcm.length);
+    const targetDuck = hasVoice ? 0.35 : 1.0;
+    this.duckGain += (targetDuck - this.duckGain) * 0.15;
+
+    const out = Buffer.allocUnsafe(buf.length);
     for (let i = 0; i < sampleCount * 2; i += 2) {
       let s = buf.readInt16LE(i);
-      if (vol !== 1.0) {
-        s = Math.max(-32768, Math.min(32767, Math.round(s * vol)));
-        out.writeInt16LE(s, i);
+      s = Math.round(s * vol * this.duckGain);
+      if (hasVoice && this.activeVoicePcm && this.voiceOffset < this.activeVoicePcm.length) {
+        const v = this.activeVoicePcm.readInt16LE(this.voiceOffset);
+        this.voiceOffset += 2;
+        s += Math.round(v * 1.1);
       }
+      s = Math.max(-32768, Math.min(32767, s));
+      out.writeInt16LE(s, i);
       const norm = s / 32768;
       sumSq += norm * norm;
+    }
+
+    if (this.activeVoicePcm && this.voiceOffset >= this.activeVoicePcm.length) {
+      this.activeVoicePcm = null;
+      this.voiceOffset = 0;
     }
 
     const rms = Math.sqrt(sumSq / sampleCount);
@@ -212,7 +228,15 @@ export class BroadcastTee {
     return out;
   }
 
+  public playVoicePcm(pcm: Buffer): void {
+    this.activeVoicePcm = pcm;
+    this.voiceOffset = 0;
+  }
+
   public stopTrackStream(): void {
+    this.activeVoicePcm = null;
+    this.voiceOffset = 0;
+    this.duckGain = 1.0;
     if (this.trackDecoder) {
       const proc = this.trackDecoder;
       this.trackDecoder = null;

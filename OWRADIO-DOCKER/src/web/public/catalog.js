@@ -158,6 +158,11 @@ function renderState(s) {
   window.currentShow = s;
   const el = window.el;
   if (el.autoplayBtn) el.autoplayBtn.textContent = s.autoplay !== false ? '🤖 Autoplay: ON' : '🤖 Autoplay: OFF';
+  if (el.djVoiceBtn) {
+    el.djVoiceBtn.textContent = s.djVoice !== false ? '🎙️ AI DJ: ON' : '🎙️ AI DJ: OFF';
+    el.djVoiceBtn.classList.toggle('pill-live', s.djVoice !== false);
+    el.djVoiceBtn.classList.toggle('pill-anchor', s.djVoice === false);
+  }
   el.anchorPill.textContent = `🌐 Engine: ${(s.vibeEngineSource || 'auto').toUpperCase()}`;
   el.playPauseBtn.textContent = s.isPlaying && !s.isPaused ? '⏸' : '▶';
   el.loopBtn.classList.toggle('active', s.loopMode && s.loopMode !== 'off');

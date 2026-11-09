@@ -115,26 +115,10 @@ app.get('/api/search', async (c) => {
 
 app.get('/api/charts', async (c) => {
   const country = (c.req.query('country') || 'gb').toLowerCase();
-  if (country === 'global') {
-    const dz = await getDeezerChartTracks(40);
-    return c.json({
-      country: 'global',
-      tracks: dz.map((t) => ({
-        id: `chart_${t.id}`, title: t.title, artist: t.artist, album: t.album,
-        duration: t.duration, durationFormatted: `${Math.floor(t.duration / 60)}:${String(t.duration % 60).padStart(2, '0')}`,
-        artworkUrl: t.cover, source: 'deezer',
-      })),
-    });
-  }
+  const mapT = (t: any, src: string) => ({ id: `chart_${t.id}`, title: t.title, artist: t.artist, album: t.album, duration: t.duration, durationFormatted: `${Math.floor(t.duration / 60)}:${String(t.duration % 60).padStart(2, '0')}`, artworkUrl: t.cover, source: src });
+  if (country === 'global') { const dz = await getDeezerChartTracks(40); return c.json({ country: 'global', tracks: dz.map((t) => mapT(t, 'deezer')) }); }
   const it = await getOfficialCharts(country as any, 40);
-  return c.json({
-    country,
-    tracks: it.map((t) => ({
-      id: `chart_${t.id}`, title: t.title, artist: t.artist, album: t.album,
-      duration: t.duration, durationFormatted: `${Math.floor(t.duration / 60)}:${String(t.duration % 60).padStart(2, '0')}`,
-      artworkUrl: t.cover, source: 'apple',
-    })),
-  });
+  return c.json({ country, tracks: it.map((t) => mapT(t, 'apple')) });
 });
 
 app.get('/api/discography', async (c) => {
@@ -269,6 +253,14 @@ app.delete('/api/queue/:index', (c) => {
     globalPlayer.emitStateUpdate();
   }
   return c.json({ ok: true, state: globalPlayer.getStateSnapshot() });
+});
+
+app.post('/api/dj/toggle', async (c) => {
+  const { isDjVoiceEnabled, setDjVoiceEnabled } = await import('../services/djVoice.js');
+  const body = (await c.req.json().catch(() => ({}))) as any;
+  const next = setDjVoiceEnabled(typeof body.enabled === 'boolean' ? body.enabled : !isDjVoiceEnabled());
+  globalPlayer.emitStateUpdate();
+  return c.json({ ok: true, djVoice: next, state: globalPlayer.getStateSnapshot() });
 });
 
 app.post('/api/vibe', async (c) => {
