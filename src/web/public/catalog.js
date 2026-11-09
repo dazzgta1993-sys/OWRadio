@@ -201,6 +201,9 @@ function renderState(s) {
     el.deck2Banner.classList.remove('hidden');
     el.deck2Text.textContent = `⚡ Deck 2 Standby: ${nextUp.title} — ${nextUp.artist}`;
     el.deck2PrewarmTag.textContent = nextUp.isPrewarmed ? '⚡ STREAM READY' : '⏳ RESOLVING';
+    if (el.deck3Text) {
+      el.deck3Text.textContent = s.deck3 ? `🎯 Deck 3 Cued: ${s.deck3.title} — ${s.deck3.artist}` : '🎯 Deck 3: Standby';
+    }
   } else {
     el.deck2Banner.classList.add('hidden');
   }

@@ -56,7 +56,7 @@ body {
 .btn-secondary { background: #232638; color: var(--text-main); }
 .btn-small { background: #1f2233; color: var(--text-muted); padding: 6px 11px; }
 .btn-small.active, .btn-small:hover { background: var(--accent); color: #fff; }
-.status-pills { display: flex; gap: 8px; }
+.status-pills { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .pill {
   font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border);
 }
@@ -184,11 +184,11 @@ body {
 .album-card-meta { font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; }
 
 @media (max-width: 1240px) {
-  .topbar { padding: 10px 14px; gap: 10px; }
+  .topbar { padding: 10px 14px; gap: 10px; flex-wrap: wrap; }
   .brand-sub { display: none; }
   .source-select { max-width: 140px; padding: 6px 8px; font-size: 11px; }
   .btn { padding: 6px 10px; font-size: 11px; }
-  .status-pills { flex-shrink: 0; gap: 6px; }
+  .status-pills { flex-shrink: 0; gap: 6px; flex-wrap: wrap; }
   .pill { font-size: 10px; padding: 4px 8px; }
 }
 @media (max-width: 1024px) {

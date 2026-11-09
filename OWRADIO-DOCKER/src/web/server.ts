@@ -37,12 +37,12 @@ function checkAdmin(c: any): boolean {
   return authService.verifySessionToken(token).valid;
 }
 
-const staticCache = new Map<string, string>();
-const loadStatic = (f: string) => { if (!staticCache.has(f)) { try { staticCache.set(f, fs.readFileSync(path.join(publicDir, f), 'utf-8')); } catch { staticCache.set(f, ''); } } return staticCache.get(f) || ''; };
-app.get('/', (c) => c.html(loadStatic('index.html')));
-app.get('/app.js', (c) => c.text(loadStatic('app.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
-app.get('/catalog.js', (c) => c.text(loadStatic('catalog.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }));
-app.get('/style.css', (c) => c.text(loadStatic('style.css'), 200, { 'Content-Type': 'text/css; charset=utf-8' }));
+const loadStatic = (f: string) => { try { return fs.readFileSync(path.join(publicDir, f), 'utf-8'); } catch { return ''; } };
+const noCache = (c: any) => c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+app.get('/', (c) => { noCache(c); return c.html(loadStatic('index.html')); });
+app.get('/app.js', (c) => { noCache(c); return c.text(loadStatic('app.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }); });
+app.get('/catalog.js', (c) => { noCache(c); return c.text(loadStatic('catalog.js'), 200, { 'Content-Type': 'application/javascript; charset=utf-8' }); });
+app.get('/style.css', (c) => { noCache(c); return c.text(loadStatic('style.css'), 200, { 'Content-Type': 'text/css; charset=utf-8' }); });
 
 app.get('/stream.mp3', (c) => {
   c.header('Content-Type', 'audio/mpeg');

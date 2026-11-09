@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OWRadio Studio — 100% Real Multi-Cloud Audio Engine</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=3.2" />
 </head>
 <body>
   <header class="topbar">
@@ -121,8 +121,12 @@
 
       <!-- Triple-Deck Standby Bar -->
       <div id="deck2Banner" class="deck-banner hidden">
-        <span id="deck2Text">⚡ Deck 2 Standby: —</span>
-        <span id="deck2PrewarmTag" class="deck-tag">STREAM READY</span>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:1;">
+          <span id="deck2Text">⚡ Deck 2 Standby: —</span>
+          <span id="deck2PrewarmTag" class="deck-tag">STREAM READY</span>
+          <span id="deck3Text" style="color:var(--text-muted);font-size:11px;">🎯 Deck 3 Cued: —</span>
+        </div>
+        <button id="announceNextBtn" class="btn btn-small" title="Force British AI DJ to announce the upcoming track over live audio">🎙️ Announce Next</button>
       </div>
 
       <!-- Tab 1: Queue -->
@@ -226,8 +230,8 @@
             <div id="likedList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
           </div>
           <div class="setting-box">
-            <h3>❄️ Smart Cooldowns (Skip &amp; Cool)</h3>
-            <p class="setting-desc">Artists cool for 2h, songs for 24h (or click ✕ to clear immediately).</p>
+            <h3>❄️ Smart Cooldowns (2.6h Separation)</h3>
+            <p class="setting-desc">Artists locked out for 2.6h (45 songs), tracks for 3.5h (60 songs) to keep station 100% fresh (click ✕ to clear).</p>
             <div id="dislikedList" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
           </div>
         </div>
@@ -235,7 +239,7 @@
     </section>
   </main>
 
-  <script src="/app.js"></script>
-  <script src="/catalog.js"></script>
+  <script src="/app.js?v=3.2"></script>
+  <script src="/catalog.js?v=3.2"></script>
 </body>
 </html>

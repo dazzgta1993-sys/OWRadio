@@ -39,6 +39,8 @@ window.el = {
   deck2Banner: document.getElementById('deck2Banner'),
   deck2Text: document.getElementById('deck2Text'),
   deck2PrewarmTag: document.getElementById('deck2PrewarmTag'),
+  deck3Text: document.getElementById('deck3Text'),
+  announceNextBtn: document.getElementById('announceNextBtn'),
   queueList: document.getElementById('queueList'),
   chartsList: document.getElementById('chartsList'),
   historyList: document.getElementById('historyList'),
@@ -265,5 +267,17 @@ if (el.djVoiceBtn) {
     const res = await fetch('/api/dj/toggle', { method: 'POST' });
     const data = await res.json();
     if (data.state && window.renderState) window.renderState(data.state);
+  });
+}
+if (el.announceNextBtn) {
+  el.announceNextBtn.addEventListener('click', async () => {
+    el.announceNextBtn.textContent = '⏳ Announcing...';
+    try {
+      await fetch('/api/dj/announce', { method: 'POST' });
+      el.announceNextBtn.textContent = '🎙️ Announced!';
+      setTimeout(() => { if (el.announceNextBtn) el.announceNextBtn.textContent = '🎙️ Announce Next'; }, 2000);
+    } catch {
+      if (el.announceNextBtn) el.announceNextBtn.textContent = '🎙️ Announce Next';
+    }
   });
 }
